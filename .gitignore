@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+.env
+.deploy.env
+seed_data/plants.db
+ha-addon/app/
+ha-addon/requirements.txt
+ha-addon/seed_data/
