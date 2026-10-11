@@ -43,19 +43,21 @@ slug `plants` → full slug **`local_plants`**.
 | --- | --- |
 | `main.py` | FastAPI app, lifespan (restore data → init DB → seed → start scheduler), static/photo mounts |
 | `config.py` | Environment-based settings (dataclass) |
-| `models.py` | SQLAlchemy models (`Plant`, `WateringEvent`, `Setting`, `Reading`) + lightweight `ALTER TABLE` migration |
+| `models.py` | SQLAlchemy models (`Plant`, `WateringEvent`, `Room`, `Setting`, `Reading`) + lightweight `ALTER TABLE` migration |
 | `schemas.py` | Pydantic request/response models |
 | `store.py` | DB-backed settings that override env vars (`get_value`/`set_value`) |
 | `ha_client.py` | Home Assistant REST client (states + `notify.*` service calls) |
-| `watering.py` | Watering-interval weather adjustment + `compute_fertilize` |
+| `watering.py` | Watering-interval weather adjustment + `compute_fertilize` + status override |
+| `environment.py` | Resolves a plant's env, merging per-room temp/humidity sensors |
 | `plantnet.py` | Pl@ntNet identification client |
-| `notifications.py` | Message building + dispatch (HA notify + SMTP email) |
+| `notifications.py` | Message building + dispatch (HA notify, ntfy, WhatsApp, email) |
 | `scheduler.py` | APScheduler jobs: daily check + 30-min env refresh |
 | `bootstrap.py` | First-run seeding from bundled photos, and restore-from-bundled-DB |
-| `routers/plants.py` | Plant CRUD, water/sick/healthy/fertilize actions, history, photo upload |
+| `routers/plants.py` | Plant CRUD, water/undo/sick/healthy/fertilize actions, history, photo upload |
+| `routers/rooms.py` | Room CRUD (per-room temp/humidity sensors) |
 | `routers/identify.py` | Pl@ntNet identify (upload / stored photo / bulk) |
-| `routers/system.py` | weather, status, settings, test notification |
-| `static/` | Single-page UI (`index.html`, `app.js`, `style.css`, `placeholder.svg`) |
+| `routers/system.py` | weather, status, settings, entities/suggest/notify-services, test notification |
+| `static/` | Single-page UI (`index.html`, `app.js`, `style.css`, `favicon.png`, `placeholder.svg`) |
 
 ### Features
 
@@ -66,8 +68,12 @@ slug `plants` → full slug **`local_plants`**.
 - **Sick watch** — mark sick (with symptom note), get a **daily** check-up reminder until marked healthy.
 - **Fertilizing reminders** — per-plant interval, only active in configured growing months.
 - **Pl@ntNet identification** — per-plant and bulk.
+- **Manual override** — force a plant's status, or correct its last-watered date.
+- **Per-room sensors** — temperature + humidity sensors per room.
+- **Undo** for accidental waterings.
+- **Notifications** — HA push, ntfy, WhatsApp (CallMeBot), Telegram, email.
+- **Sidebar panel** — embeds in the Home Assistant sidebar via ingress.
 - **Simulator** — mock Home Assistant for testing without real HA.
-- Notifications via HA `notify.*` services (mobile app / Telegram) and optional SMTP email.
 
 ---
 
@@ -102,9 +108,9 @@ shows "feeding off-season". Baseline for first feed is the plant's `created_at`.
 
 - API: `POST https://my-api.plantnet.org/v2/identify/{project}?api-key=…`, multipart
   `images` + `organs` (`auto`/`leaf`/`flower`/`fruit`/`bark`). Free tier ~500 req/day.
-- The API key is configured in three places: `.env` (gitignored),
-  `ha-addon/config.yaml` options (masked `password` field), and the app's settings DB.
-  **Do not paste the key into LOG/README or commit it.**
+- The API key is configured in `.env` (gitignored), the app's settings DB, and the
+  add-on options. **The committed `ha-addon/config.yaml` has it blanked** — do not
+  paste the key into LOG/README or commit it.
 - `httpx` request logging is silenced so the key never lands in logs.
 - Identification is **display-only**; it never changes a watering schedule.
 
@@ -304,6 +310,29 @@ every browser):
   plant rooms lacking sensors with a ＋ to configure, and saving upserts the room
   (PATCH if the name exists, else POST).
 
+**v1.0.9:** added an on-screen diagnostic in Settings — the grey line now shows
+`N entities from HA · X temperature · Y humidity` (or the load error) so empty
+dropdowns can be diagnosed without the browser console. Removed a duplicate
+auto-detect call and stopped clearing that message.
+
+### Version control (git)
+
+A git repository was initialised at `plants-app/` (branch `main`) and the work was
+committed as **13 incremental, dependency-ordered commits**:
+scaffold → core → HA/watering → rooms → notifications → Pl@ntNet → API/main →
+UI → Docker → add-on → deploy → sim → docs.
+
+- **Secret scrubbed:** the Pl@ntNet key was removed from `ha-addon/config.yaml`
+  (a tracked file) before committing; it remains only in the gitignored `.env`
+  and on the device. Verified absent from all git history
+  (`git log -S <key>` finds nothing).
+- **Ignored:** `.env`, `.deploy.env`, `data/`, `.venv/`, `__pycache__/`, and the
+  generated add-on build copies (`ha-addon/app`, `ha-addon/seed_data`,
+  `ha-addon/requirements.txt`).
+- Because the repo had no prior history, each commit carries the **final** content
+  of the files it introduces (no byte-perfect replay), so the history is a clean
+  feature-by-feature progression rather than every intermediate edit.
+
 ---
 
 ## 9. Configuration reference
@@ -320,27 +349,24 @@ Settings UI (persisted in the DB, DB wins). Key vars: `HA_URL`, `HA_TOKEN`,
 ## 10. Status — what works vs. what's open
 
 **Working / verified**
-- Full app + UI, weather-adjusted watering, sick watch, fertilizing, Pl@ntNet, simulator.
-- Add-on build context, deploy script, data carry-over, Supervisor auth.
-- Self-seeding and restore-from-bundle verified with a clean data dir.
+- Full app + UI, weather-adjusted watering, sick watch, fertilizing, Pl@ntNet,
+  manual status, per-room sensors, undo, simulator.
+- Add-on deployed and running on the Pi (ingress sidebar panel, data carried over).
+- `GET /api/settings` 500 fixed; Settings UI opens; git history committed (13 commits).
 
 **Open / next steps**
-1. **Finish install on the Pi**: re-run `./deploy.sh`, then HA → Add-on Store →
-   Check for updates → Local add-ons → Home Plants → Install/Update → Start.
-2. **Fill add-on Configuration** (entity IDs + notify service + timezone):
-   ```
-   weather entity:        weather.______
-   outdoor temp sensor:   sensor.______
-   indoor temp sensor:    sensor.______
-   phone notify service:  notify.mobile_app______
-   timezone:              Europe/Madrid
-   ```
-   (Not yet provided by the user.) These can be baked into `ha-addon/config.yaml`
-   options or set after install in the add-on's Configuration tab.
-3. **Confirm the Pi architecture** (aarch64 vs armv7l) — `deploy.sh` prints it;
-   build path already works for both.
-4. Optional: re-identify low-confidence plants (flower organ), verify the
-   two White Heather entries, add SMTP email, rain-forecast-based delays.
+1. **Entity dropdowns came back empty after v1.0.9, and rooms couldn't be added.**
+   The app isn't receiving HA's entity list. Diagnose with the Settings grey
+   diagnostic line (v1.0.9) and with `GET /api/ha/entities` +
+   `/api/status` → `ha_state_count`:
+   - `0` / `[]` → the add-on isn't reaching HA core (`homeassistant_api`/token).
+   - non-zero → inspect the dropdown filters on the frontend.
+2. **Configure sensors + notify service** from the app's **Settings** (the fields
+   are dropdowns populated from HA): weather, outdoor/indoor temp, rain; add a
+   room with its temp/humidity sensors; set the phone notify service. Then use
+   **Send test**.
+3. Optional: re-identify low-confidence plants (flower organ), verify the two
+   White Heather entries, add SMTP email, rain-forecast-based delays.
 
 ---
 
@@ -361,8 +387,97 @@ cp .deploy.env.example .deploy.env   # fill HA_HOST / SSH / token
 # HA token sanity check (won't print the token)
 source .deploy.env
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $HA_TOKEN" "${HA_API_URL%/}/api/"
+
+# Git
+git log --oneline          # 13 incremental commits
 ```
 
 Key files: `README.md` (docs), `LOG.md` (this file), `.env` (secrets, gitignored),
 `.deploy.env` (deploy target, gitignored), `ha-addon/` (add-on), `sim/` (simulator),
 `data/` (runtime DB + photos, gitignored).
+
+---
+
+## 12. Changelog (add-on versions)
+
+Versions are the Home Assistant add-on `version` in `ha-addon/config.yaml`. The
+app and add-on ship together, so each entry is the set of changes delivered in
+that bump (1.0.0 is everything built up to the first deploy).
+
+### 1.0.0 — Initial release
+- Self-hosted **FastAPI + SQLite** app with a plain **HTML/CSS/JS** UI.
+- **Plant library** with photos (12 bundled seed photos), species, room, notes,
+  and indoor/outdoor placement.
+- **Weather/temperature-adjusted watering** intervals with a visible reason;
+  status badges (Overdue / Water today / Due soon / Happy) and filter tabs.
+- **Mark watered** + watering history.
+- **Sick watch** — mark sick (with a note) and get a daily check-up reminder.
+- **Seasonal fertilizing reminders** (only during configured growing months).
+- **Pl@ntNet identification** (per-plant and bulk).
+- Notifications via HA `notify.*` services + optional **SMTP email**; daily
+  **APScheduler** check + 30-min environment refresh.
+- **Docker** packaging and a local **Home Assistant add-on** (`config.yaml`,
+  `Dockerfile`, `run.sh`).
+- **`deploy.sh` + `.deploy.env`** (SSH upload, optional data carry-over) and
+  first-run **seeding / restore-from-bundle** (`bootstrap.py`).
+- **Mock Home Assistant simulator** (`sim/`) for local testing.
+
+### 1.0.1 — Raspberry Pi build reliability
+- `requirements.txt`: `uvicorn[standard]` → plain **`uvicorn`** (drops `uvloop`,
+  `httptools`, `watchfiles`, which have no ARM wheels and forced source builds /
+  failures on the Pi). All deps now install from pure-Python or ARM wheels.
+- `deploy.sh` prints the **device architecture** and warns on 32-bit ARM.
+
+### 1.0.2 — Add-on polish
+- **Ingress** support → a **Plants panel in the Home Assistant sidebar**
+  (`ingress`, `ingress_port`, `panel_icon`, `panel_title`); frontend switched to
+  **relative URLs**, plus a middleware that strips an
+  `/api/hassio_ingress/<token>/` prefix.
+- **Add-on icon** (`icon.png`, `logo.png`) and a browser `favicon.png`.
+- **Watering undo** — `POST /api/plants/{id}/water/undo` and a toast **Undo** button.
+- **Entity autocomplete** via `GET /api/ha/entities` (datalist-backed).
+
+### 1.0.3 — Diagnostics & auto-detect
+- `GET /api/ha/suggest` + a **"Auto-detect entities"** button; Settings pre-fills
+  empty fields on open.
+- `/api/status` gained `ha_state_count` and `entities_configured`; the badge now
+  distinguishes **HA connected** / **Set sensors** / **HA offline**.
+
+### 1.0.4 — Settings crash fix & cache-busting
+- Fixed **`GET /api/settings` HTTP 500** (empty `notify_services`/`email_to` were
+  returned as `None`); corrected `store.get_value` env precedence.
+- Added a **`no-store`** middleware and `?v=` query on static assets so a stale
+  `app.js` can't break the UI after an update.
+
+### 1.0.5 — Manual control, rooms, notifications
+- **Manual plant status override** (`status_override`) and an editable
+  **last watered** date.
+- **Per-room sensors**: `Room` model + `/api/rooms` CRUD; `app/environment.py`
+  merges a plant's room temp/humidity; plants matched to rooms by `location`.
+- **Notifications**: added **ntfy** and **WhatsApp (CallMeBot)** channels plus
+  `GET /api/ha/notify-services`; new settings `ntfy_*`, `whatsapp_*`.
+- UI: Status select + last-watered picker; Push/WhatsApp section; Rooms & sensors
+  section.
+
+### 1.0.6 — Robust matching
+- Broadened entity filters to also match on entity id / friendly name
+  (`temp`, `hum`, `rain`).
+- Room→plant matching is now **case-insensitive / trimmed** (`environment._norm`).
+
+### 1.0.7 — Reliable autocomplete
+- Replaced `<datalist>` with a **custom dropdown** we control (works on every
+  browser, Safari included).
+
+### 1.0.8 — Dropdowns instead of typing
+- Converted the sensor/room fields to real **`<select>`** dropdowns:
+  - weather = all `weather.*`; outdoor/indoor temp = all temperature sensors;
+    rain = precipitation sensors;
+  - room = **distinct plant Locations** (+ existing room names); room temp = all
+    temperature sensors; room humidity = all humidity sensors.
+- Saving a room **upserts** (PATCH if the name exists, else POST).
+
+### 1.0.9 — On-screen diagnostics
+- Settings shows a grey diagnostic line (`N entities from HA · X temperature ·
+  Y humidity`, or the load error) so empty dropdowns can be debugged without the
+  browser console.
+- Removed a duplicate auto-detect call and stopped clearing that message.
