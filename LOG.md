@@ -537,3 +537,10 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   so several phones/services can be ticked at once (same style as the months).
 - Added a `.checks` grid style and a checkbox reset so the boxes are not padded
   like text inputs. Version bumped to **1.1.1**.
+
+### 1.1.2 — Password managers ignore the secret fields
+- The masked fields (SMTP password / app password, Pl@ntNet API key) now carry
+  `data-bwignore`, `data-1p-ignore`, `data-lpignore` and `data-form-type="other"`
+  so Bitwarden/1Password/LastPass stop treating them as login fields (which made
+  their autofill menu pop up in the wrong place inside the ingress iframe).
+  Version bumped to **1.1.2**.

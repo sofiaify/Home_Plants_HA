@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home Plants</title>
-  <link rel="icon" href="static/favicon.png?v=1.1.1" />
-  <link rel="stylesheet" href="static/style.css?v=1.1.1" />
+  <link rel="icon" href="static/favicon.png?v=1.1.2" />
+  <link rel="stylesheet" href="static/style.css?v=1.1.2" />
 </head>
 <body>
   <header class="topbar">
@@ -118,7 +118,7 @@
           <label class="check"><input type="checkbox" id="set-smtp-tls" checked /> Use TLS/STARTTLS</label>
         </div>
         <label>SMTP username<input id="set-smtp-user" autocomplete="off" placeholder="you@gmail.com" /></label>
-        <label>SMTP password / app password<input id="set-smtp-password" type="password" autocomplete="new-password" /></label>
+        <label>SMTP password / app password<input id="set-smtp-password" type="password" autocomplete="new-password" data-bwignore="true" data-1p-ignore data-lpignore="true" data-form-type="other" /></label>
         <label>From address (optional)<input id="set-smtp-from" autocomplete="off" placeholder="defaults to username" /></label>
         <button type="button" class="ghost" id="btn-detect" style="margin-bottom:8px">🪄 Auto-detect entities</button>
         <label>Weather entity<select id="set-weather"></select></label>
@@ -126,7 +126,7 @@
         <label>Indoor temperature entity<select id="set-indoor"></select></label>
         <label>Rain entity<select id="set-rain"></select></label>
         <h3 class="settings-sub">Pl@ntNet identification</h3>
-        <label>API key<input id="set-plantnet-key" type="password" placeholder="from my.plantnet.org" autocomplete="off" /></label>
+        <label>API key<input id="set-plantnet-key" type="password" placeholder="from my.plantnet.org" autocomplete="off" data-bwignore="true" data-1p-ignore data-lpignore="true" data-form-type="other" /></label>
         <label>Project / flora<input id="set-plantnet-project" placeholder="all" /></label>
         <label>Language<input id="set-plantnet-lang" placeholder="en" /></label>
         <div class="modal-actions">
@@ -140,6 +140,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="static/app.js?v=1.1.1"></script>
+  <script src="static/app.js?v=1.1.2"></script>
 </body>
 </html>
