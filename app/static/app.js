@@ -135,7 +135,6 @@ function cardHTML(plant) {
           <button class="primary water-btn">${showOk ? "💧 Water" : "💧 Mark watered"}</button>
           <button class="ghost icon-btn sick-btn" title="${plant.is_sick ? "Mark healthy" : "Mark sick"}">${plant.is_sick ? "💚" : "🤒"}</button>
           ${feedBtn}
-          <button class="ghost icon-btn edit-btn" title="Edit">✎</button>
         </div>
       </div>
     </div>`;
@@ -160,12 +159,17 @@ function renderPlants() {
   grid.querySelectorAll(".card").forEach((card) => {
     const id = Number(card.dataset.id);
     const plant = state.plants.find((p) => p.id === id);
-    card.querySelector(".water-btn").addEventListener("click", () => waterPlant(id));
-    card.querySelector(".edit-btn").addEventListener("click", () => openPlantModal(id));
-    const sickBtn = card.querySelector(".sick-btn");
-    if (sickBtn) sickBtn.addEventListener("click", () => (plant.is_sick ? markHealthy(id) : markSick(id)));
-    const feedBtn = card.querySelector(".feed-btn");
-    if (feedBtn) feedBtn.addEventListener("click", () => fertilizePlant(id));
+    card.addEventListener("click", () => openPlantModal(id));
+    const act = (selector, handler) => {
+      const el = card.querySelector(selector);
+      if (el) el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handler();
+      });
+    };
+    act(".water-btn", () => waterPlant(id));
+    act(".sick-btn", () => (plant.is_sick ? markHealthy(id) : markSick(id)));
+    act(".feed-btn", () => fertilizePlant(id));
   });
 }
 
@@ -658,6 +662,15 @@ function init() {
   document.querySelectorAll("[data-close]").forEach((btn) =>
     btn.addEventListener("click", (e) => e.target.closest(".modal").classList.add("hidden"))
   );
+  document.querySelectorAll(".modal").forEach((modal) =>
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.classList.add("hidden");
+    })
+  );
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    document.querySelectorAll(".modal:not(.hidden)").forEach((modal) => modal.classList.add("hidden"));
+  });
   document.querySelectorAll(".filters button").forEach((btn) =>
     btn.addEventListener("click", () => {
       document.querySelectorAll(".filters button").forEach((b) => b.classList.remove("active"));

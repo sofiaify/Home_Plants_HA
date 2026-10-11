@@ -501,3 +501,14 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   HA **WebSocket** endpoint plus sample areas/sensors (Living Room with two temp
   + two humidity sensors, Bedroom with one, Bathroom with none) for testing all
   three cases.
+- Filter room sensors by `device_class` first (only fall back to the unit when
+  it is absent) so a **battery** (`unit "%"`, `device_class "battery"`) is not
+  mistaken for a humidity sensor.
+
+### 1.0.11 — Card & modal interactions
+- Removed the ✎ edit button from plant cards; the **whole card** (photo + text)
+  is now clickable and opens the editor. The action buttons (water / sick / feed)
+  stop propagation so they still behave on their own.
+- The plant editor (and Settings) now close on **Esc** or by clicking **outside**
+  the card.
+- Bumped static asset `?v=` query to 1.0.11 so browsers pick up the new files.
