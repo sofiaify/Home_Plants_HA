@@ -1,0 +1,11 @@
+services:
+  plants:
+    build: .
+    container_name: plants-app
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
