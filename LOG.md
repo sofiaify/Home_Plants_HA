@@ -512,3 +512,20 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
 - The plant editor (and Settings) now close on **Esc** or by clicking **outside**
   the card.
 - Bumped static asset `?v=` query to 1.0.11 so browsers pick up the new files.
+
+### 1.1.0 — Simpler notifications & working email
+- **Removed the ntfy and WhatsApp (CallMeBot) channels** (`config`, `store`,
+  `schemas`, `notifications`, Settings UI). Delivery is now Home Assistant
+  mobile-app push and/or email.
+- **Notify service** is a dropdown populated from `GET /api/ha/notify-services`,
+  filtered to `notify.mobile_app_*` (no more typing service names).
+- **Reminder months** is a multi-select of the twelve months of the year instead
+  of a comma-separated text field.
+- **Email (SMTP) fixed and configurable in-app.** `smtp_host/port/user/password/
+  from/tls` are now stored settings (env fallback) with fields in Settings, and
+  `_send_email` reads them from the DB. Gmail works with an **app password**
+  (`smtp.gmail.com:587`, STARTTLS). Port 465 uses implicit TLS.
+- **Send test** now reports the actual SMTP result/error (`email: no
+  (<reason>)`) instead of a bare yes/no, so failures are diagnosable.
+- Add-on options/schema gained `smtp_*` (and `run.sh` exports them); README
+  documents the Gmail app-password setup. Version bumped to **1.1.0**.

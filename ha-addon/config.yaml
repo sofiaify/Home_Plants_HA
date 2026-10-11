@@ -1,5 +1,5 @@
 name: "Home Plants"
-version: "1.0.11"
+version: "1.1.0"
 slug: "plants"
 description: "Track your houseplants, get watering reminders, and auto-adjust schedules from weather."
 url: "https://github.com/your/plants-app"
@@ -28,6 +28,12 @@ options:
   ha_rain_entity: ""
   notify_services: []
   email_to: []
+  smtp_host: ""
+  smtp_port: 587
+  smtp_user: ""
+  smtp_password: ""
+  smtp_from: ""
+  smtp_tls: true
   notify_time: "08:00"
   timezone: "UTC"
   fertilize_months:
@@ -49,6 +55,12 @@ schema:
     - str
   email_to:
     - str
+  smtp_host: str
+  smtp_port: int
+  smtp_user: str
+  smtp_password: password
+  smtp_from: str
+  smtp_tls: bool
   notify_time: str
   timezone: str
   fertilize_months:

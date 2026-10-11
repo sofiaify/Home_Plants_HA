@@ -24,8 +24,8 @@ a **Docker container**, or directly with **Python** for development.
 - **Weather-aware adjustments** — the effective interval is recalculated from the
   indoor/outdoor temperature, humidity, weather condition and (optionally) rain.
 - **Reminders** — a daily check pushes a notification listing every plant that is
-  due or overdue. Delivered through the Home Assistant notify service
-  (mobile app, Telegram, etc.) and/or email (SMTP).
+  due or overdue. Delivered through the Home Assistant mobile-app notify service
+  and/or email (SMTP).
 - **Mark as watered** — one tap records the event, reschedules the plant, and
   keeps a full watering history.
 - **Undo** — accidental watering? The confirmation toast (and a `/water/undo`
@@ -34,8 +34,8 @@ a **Docker container**, or directly with **Python** for development.
   or correct its *last watered* date from the editor.
 - **Rooms from Home Assistant** — pick a plant's HA area; the app reads the
   temperature/humidity sensors linked to that room and uses them for scheduling.
-- **Notifications** — Home Assistant push (`notify.mobile_app_*`), **ntfy**,
-  **WhatsApp** (CallMeBot), Telegram or email.
+- **Notifications** — Home Assistant mobile-app push (`notify.mobile_app_*`)
+  and email.
 - **Home Assistant sidebar panel** — installed as an add-on with **ingress**, the
   app appears as a **Plants** panel in the HA sidebar (leaf icon).
 - **Entity autocomplete** — the Settings screen suggests matching weather /
@@ -141,12 +141,12 @@ environment variables** (values chosen in the UI are persisted in the database).
 | `HA_OUTDOOR_TEMP_ENTITY` | Outdoor temperature      | e.g. `sensor.outdoor_temperature`                              |
 | `HA_INDOOR_TEMP_ENTITY`  | Indoor temperature       | Temperature used for indoor plants                             |
 | `HA_RAIN_ENTITY`         | Rain entity              | Optional rain gauge in mm                                      |
-| `NOTIFY_SERVICES`        | Notify services          | Comma separated, e.g. `notify.mobile_app_phone, notify.telegram` |
+| `NOTIFY_SERVICES`        | Notify service           | A `notify.mobile_app_*` service, e.g. `notify.mobile_app_phone` |
 | `NOTIFY_TIME`            | Daily reminder time      | `HH:MM` local time for the daily check                         |
 | `FERTILIZE_MONTHS`       | Fertilize months         | Months (1-12) when feeding reminders are active, e.g. `3,4,5,6,7,8` |
 | `TZ`                     | Timezone                 | e.g. `Europe/Madrid` — used for scheduling and display         |
 | `EMAIL_TO`               | Email recipients         | Comma separated addresses for the email fallback               |
-| `SMTP_HOST` … `SMTP_TLS` | –                        | SMTP server used for email notifications                       |
+| `SMTP_HOST` … `SMTP_TLS` | Email (SMTP)             | SMTP server used for email notifications (e.g. Gmail + app password) |
 | `PLANTNET_API_KEY`       | Pl@ntNet API key         | Key from [my.plantnet.org](https://my.plantnet.org) — enables identification |
 | `PLANTNET_PROJECT`       | Pl@ntNet project         | Flora to use, e.g. `all` or `k-southwestern-europe`           |
 | `PLANTNET_LANG`          | Pl@ntNet language        | Language code for common names, e.g. `en`, `es`               |
@@ -232,27 +232,35 @@ Notes:
   and notifies for every active plant that is *Overdue* or *Water today*.
 - Environment readings are refreshed every **30 minutes** so the schedules used
   throughout the day stay current.
-- Delivery uses any Home Assistant `notify.*` services you list, plus optional
-  email. Use the **Send test** button in Settings to verify your setup.
+- Delivery uses the Home Assistant mobile-app notify service you pick, plus
+  optional email. Use the **Send test** button in Settings to verify your setup.
 
 ### Choosing a notification channel
 
-Set any of these in **Settings**; the daily check sends to every configured channel.
+Pick a channel in **Settings**; the daily check sends to every configured channel.
 
-- **Home Assistant mobile app (push):** install the HA companion app, then put its
-  service (e.g. `notify.mobile_app_pixel`) in *Notify services*. The Settings field
-  autocompletes the `notify.*` services your instance exposes.
-- **ntfy (push, no account):** install the [ntfy](https://ntfy.sh) app, subscribe
-  to a topic, and set that topic in *ntfy topic* (`ntfy server` defaults to
-  `https://ntfy.sh`; point it at your own server if you self-host).
-- **WhatsApp via CallMeBot (unofficial):** send
-  `I allow callmebot to send me messages` on WhatsApp to `+34 644 51 95 23`, then
-  set the returned API key and your number (with country code) in *WhatsApp* fields.
-  You can also use Twilio's WhatsApp through a HA `notify.*` service instead.
-- **Telegram:** add the Telegram integration in HA and use `notify.telegram`.
-- **Email:** fill the `SMTP_*` variables and `EMAIL_TO`.
+- **Home Assistant mobile app (push):** install the HA companion app. The
+  *Notify service* dropdown lists the `notify.mobile_app_*` services your instance
+  exposes — choose your phone's.
+- **Email (SMTP):** fill the *Email (SMTP)* section in Settings — host, port,
+  username, password and recipients. You can use Gmail with an **app password**
+  (see below).
 
-Use the **Send test** button to confirm delivery.
+Use the **Send test** button to confirm delivery; it reports the SMTP error if
+one occurs.
+
+#### Gmail with an app password
+
+1. On your Google account, turn on **2-Step Verification**.
+2. Go to **Google Account → Security → App passwords**, create one (e.g. "Plants")
+   and copy the 16-character password.
+3. In the app's Settings → *Email (SMTP)*:
+   - SMTP host: `smtp.gmail.com`
+   - SMTP port: `587`, leave **Use TLS/STARTTLS** checked
+   - SMTP username: your full Gmail address
+   - SMTP password: the **app password** (not your normal password)
+   - From address: leave blank to use the username
+   - Email recipients: where to send (can be the same address)
 
 ### Rooms & sensors
 
@@ -272,12 +280,6 @@ then looks up the sensors linked to that room:
 
 Only indoor plants use room sensors; outdoor plants still use the outdoor
 temperature/weather from Settings.
-
-### Adding Telegram / email
-
-- **Telegram:** set up the Telegram integration or a notify service in HA, then
-  add `notify.telegram` (or your service) to *Notify services*.
-- **Email:** fill in the `SMTP_*` variables and `EMAIL_TO`.
 
 ---
 

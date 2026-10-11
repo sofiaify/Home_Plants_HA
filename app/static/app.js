@@ -574,15 +574,47 @@ async function loadEntityPickers(settings) {
     : `${items.length} entities from HA · ${tempN} temperature · ${humN} humidity`;
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function fillMonthSelect(selected) {
+  const sel = $("set-fert-months");
+  const chosen = new Set((selected || []).map(Number));
+  sel.innerHTML = MONTH_NAMES.map(
+    (name, i) => `<option value="${i + 1}"${chosen.has(i + 1) ? " selected" : ""}>${name}</option>`
+  ).join("");
+}
+
+async function fillNotifyServices(selected) {
+  let items = [];
+  try {
+    const services = await api("/api/ha/notify-services");
+    items = (services || [])
+      .filter((s) => s.startsWith("notify.mobile_app_"))
+      .map((s) => ({ value: s, label: s }));
+  } catch (err) {
+    /* ignore — leave the picker empty */
+  }
+  fillSelect("set-notify-services", items, (selected || [])[0] || "");
+}
+
 async function openSettings() {
   try {
     const s = await api("/api/settings");
     await loadEntityPickers(s);
     $("set-notify-time").value = s.notify_time || "08:00";
     $("set-timezone").value = s.timezone || "";
-    $("set-fert-months").value = (s.fertilize_months || []).join(", ");
-    $("set-notify-services").value = (s.notify_services || []).join(", ");
+    fillMonthSelect(s.fertilize_months);
+    await fillNotifyServices(s.notify_services);
     $("set-email-to").value = (s.email_to || []).join(", ");
+    $("set-smtp-host").value = s.smtp_host || "";
+    $("set-smtp-port").value = s.smtp_port || 587;
+    $("set-smtp-user").value = s.smtp_user || "";
+    $("set-smtp-password").value = s.smtp_password || "";
+    $("set-smtp-from").value = s.smtp_from || "";
+    $("set-smtp-tls").checked = s.smtp_tls !== false;
     $("set-weather").value = s.ha_weather_entity || "";
     $("set-outdoor").value = s.ha_outdoor_temp_entity || "";
     $("set-indoor").value = s.ha_indoor_temp_entity || "";
@@ -590,10 +622,6 @@ async function openSettings() {
     $("set-plantnet-key").value = s.plantnet_api_key || "";
     $("set-plantnet-project").value = s.plantnet_project || "all";
     $("set-plantnet-lang").value = s.plantnet_lang || "en";
-    $("set-ntfy-topic").value = s.ntfy_topic || "";
-    $("set-ntfy-server").value = s.ntfy_server || "";
-    $("set-wa-phone").value = s.whatsapp_phone || "";
-    $("set-wa-apikey").value = s.whatsapp_apikey || "";
     $("settings-modal").classList.remove("hidden");
     if (!$("set-weather").value && !$("set-outdoor").value && !$("set-indoor").value) {
       detectEntities(true);
@@ -606,12 +634,19 @@ async function openSettings() {
 async function saveSettings(event) {
   event.preventDefault();
   const splitList = (v) => v.split(",").map((s) => s.trim()).filter(Boolean);
+  const notifyService = $("set-notify-services").value;
   const payload = {
     notify_time: $("set-notify-time").value,
     timezone: $("set-timezone").value.trim(),
-    fertilize_months: splitList($("set-fert-months").value).map(Number).filter((n) => n >= 1 && n <= 12),
-    notify_services: splitList($("set-notify-services").value),
+    fertilize_months: [...$("set-fert-months").selectedOptions].map((o) => Number(o.value)),
+    notify_services: notifyService ? [notifyService] : [],
     email_to: splitList($("set-email-to").value),
+    smtp_host: $("set-smtp-host").value.trim(),
+    smtp_port: Number($("set-smtp-port").value) || 587,
+    smtp_user: $("set-smtp-user").value.trim(),
+    smtp_password: $("set-smtp-password").value,
+    smtp_from: $("set-smtp-from").value.trim(),
+    smtp_tls: $("set-smtp-tls").checked,
     ha_weather_entity: $("set-weather").value.trim(),
     ha_outdoor_temp_entity: $("set-outdoor").value.trim(),
     ha_indoor_temp_entity: $("set-indoor").value.trim(),
@@ -619,10 +654,6 @@ async function saveSettings(event) {
     plantnet_api_key: $("set-plantnet-key").value.trim(),
     plantnet_project: $("set-plantnet-project").value.trim() || "all",
     plantnet_lang: $("set-plantnet-lang").value.trim() || "en",
-    ntfy_topic: $("set-ntfy-topic").value.trim(),
-    ntfy_server: $("set-ntfy-server").value.trim() || "https://ntfy.sh",
-    whatsapp_phone: $("set-wa-phone").value.trim(),
-    whatsapp_apikey: $("set-wa-apikey").value.trim(),
   };
   try {
     await api("/api/settings", { method: "PUT", body: JSON.stringify(payload) });
@@ -637,7 +668,9 @@ async function testNotification() {
   $("settings-msg").textContent = "Sending…";
   try {
     const result = await api("/api/notify/test", { method: "POST" });
-    $("settings-msg").textContent = `Sent. HA: ${result.ha.length}, email: ${result.email ? "yes" : "no"}`;
+    const email = result.email || {};
+    const emailText = email.ok ? "yes" : `no${email.error ? ` (${email.error})` : ""}`;
+    $("settings-msg").textContent = `HA: ${result.ha.length} sent, email: ${emailText}`;
   } catch (err) {
     $("settings-msg").textContent = "Failed: " + err.message;
   }

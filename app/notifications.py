@@ -6,7 +6,6 @@ import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
 
-import httpx
 from sqlalchemy.orm import Session
 
 from . import store
@@ -22,9 +21,34 @@ def _where(plant: Plant) -> str:
     return f" ({plant.location})" if plant.location else ""
 
 
+def _smtp_config(db: Session) -> dict:
+    """Resolve SMTP settings from the DB, falling back to the environment."""
+    def get(key: str, default):
+        return store.get_value(db, key, default)
+
+    try:
+        port = int(get("smtp_port", env_settings.smtp_port))
+    except (TypeError, ValueError):
+        port = 587
+    tls_raw = get("smtp_tls", env_settings.smtp_tls)
+    if isinstance(tls_raw, bool):
+        tls = tls_raw
+    else:
+        tls = str(tls_raw).strip().lower() in {"1", "true", "yes", "on"}
+    user = (get("smtp_user", env_settings.smtp_user) or "").strip()
+    return {
+        "host": (get("smtp_host", env_settings.smtp_host) or "").strip(),
+        "port": port,
+        "user": user,
+        "password": get("smtp_password", env_settings.smtp_password) or "",
+        "from": (get("smtp_from", env_settings.smtp_from) or "").strip() or user,
+        "tls": tls,
+    }
+
+
 async def dispatch(db: Session, title: str, body: str) -> dict:
     """Send one message through every configured channel."""
-    results: dict = {"ha": [], "email": False, "ntfy": False, "whatsapp": False}
+    results: dict = {"ha": [], "email": {"ok": False, "error": ""}}
 
     services = store.get_value(db, "notify_services", env_settings.notify_services) or []
     ha = HAClient(db)
@@ -32,49 +56,15 @@ async def dispatch(db: Session, title: str, body: str) -> dict:
         ok = await ha.call_notify(service, body, title)
         results["ha"].append({"service": service, "ok": ok})
 
-    results["ntfy"] = await _send_ntfy(db, title, body)
-    results["whatsapp"] = await _send_whatsapp(db, body)
-
     recipients = store.get_value(db, "email_to", env_settings.email_to) or []
     if recipients:
-        results["email"] = await asyncio.to_thread(_send_email, title, body, recipients)
+        results["email"] = await asyncio.to_thread(
+            _send_email, _smtp_config(db), title, body, recipients
+        )
+    else:
+        results["email"] = {"ok": False, "error": "no email recipients configured"}
 
     return results
-
-
-async def _send_ntfy(db: Session, title: str, body: str) -> bool:
-    topic = store.get_value(db, "ntfy_topic", env_settings.ntfy_topic) or ""
-    if not topic:
-        return False
-    server = (store.get_value(db, "ntfy_server", env_settings.ntfy_server) or "https://ntfy.sh").rstrip("/")
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                f"{server}/{topic}",
-                content=body.encode(),
-                headers={"Title": title, "Tags": "potted_plant"},
-            )
-        return resp.status_code < 400
-    except httpx.HTTPError as exc:
-        log.warning("ntfy notification failed: %s", exc)
-        return False
-
-
-async def _send_whatsapp(db: Session, body: str) -> bool:
-    phone = store.get_value(db, "whatsapp_phone", env_settings.whatsapp_phone) or ""
-    apikey = store.get_value(db, "whatsapp_apikey", env_settings.whatsapp_apikey) or ""
-    if not phone or not apikey:
-        return False
-    try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.get(
-                "https://api.callmebot.com/whatsapp.php",
-                params={"phone": phone, "text": body, "apikey": apikey},
-            )
-        return resp.status_code < 400
-    except httpx.HTTPError as exc:
-        log.warning("WhatsApp (CallMeBot) notification failed: %s", exc)
-        return False
 
 
 def build_watering_message(plants_due: list[Plant], env: dict) -> tuple[str, str]:
@@ -135,25 +125,42 @@ def build_fertilize_message(plants: list[Plant], months: list[int]) -> tuple[str
     return title, body
 
 
-def _send_email(subject: str, body: str, recipients: list[str]) -> bool:
-    if not env_settings.smtp_host or not recipients:
-        return False
+def _send_email(config: dict, subject: str, body: str, recipients: list[str]) -> dict:
+    host = config.get("host") or ""
+    if not host:
+        return {"ok": False, "error": "SMTP host is not configured"}
+    if not recipients:
+        return {"ok": False, "error": "no email recipients configured"}
+
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = env_settings.smtp_from or env_settings.smtp_user
+    msg["From"] = config.get("from") or config.get("user") or ""
     msg["To"] = ", ".join(recipients)
     msg.set_content(body)
+
+    port = config.get("port") or 587
+    tls = bool(config.get("tls"))
+    user = config.get("user") or ""
     try:
-        with smtplib.SMTP(env_settings.smtp_host, env_settings.smtp_port, timeout=15) as smtp:
-            if env_settings.smtp_tls:
+        # Implicit TLS on 465; STARTTLS on everything else (587, 25).
+        if tls and port == 465:
+            smtp = smtplib.SMTP_SSL(host, port, timeout=20)
+        else:
+            smtp = smtplib.SMTP(host, port, timeout=20)
+        with smtp:
+            if tls and port != 465:
                 smtp.starttls()
-            if env_settings.smtp_user:
-                smtp.login(env_settings.smtp_user, env_settings.smtp_password)
+            if user:
+                smtp.login(user, config.get("password") or "")
             smtp.send_message(msg)
-        return True
-    except OSError as exc:
+        return {"ok": True, "error": ""}
+    except smtplib.SMTPAuthenticationError as exc:
+        err = exc.smtp_error.decode(errors="replace") if isinstance(exc.smtp_error, bytes) else str(exc.smtp_error)
+        log.warning("SMTP authentication failed: %s", err)
+        return {"ok": False, "error": f"authentication failed: {err}"}
+    except Exception as exc:  # noqa: BLE001 - surface any SMTP/socket error to the UI
         log.warning("Email notification failed: %s", exc)
-        return False
+        return {"ok": False, "error": str(exc)}
 
 
 async def send_reminders(db: Session, plants_due: list[Plant], env: dict) -> dict:

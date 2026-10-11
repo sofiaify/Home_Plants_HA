@@ -12,6 +12,12 @@ OVERRIDABLE = {
     "notify_time",
     "notify_services",
     "email_to",
+    "smtp_host",
+    "smtp_port",
+    "smtp_user",
+    "smtp_password",
+    "smtp_from",
+    "smtp_tls",
     "ha_weather_entity",
     "ha_outdoor_temp_entity",
     "ha_indoor_temp_entity",
@@ -21,10 +27,6 @@ OVERRIDABLE = {
     "plantnet_project",
     "plantnet_lang",
     "fertilize_months",
-    "ntfy_topic",
-    "ntfy_server",
-    "whatsapp_phone",
-    "whatsapp_apikey",
 }
 
 _LIST_KEYS = {"notify_services", "email_to", "fertilize_months"}

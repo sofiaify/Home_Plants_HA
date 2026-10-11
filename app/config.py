@@ -60,11 +60,5 @@ class Settings:
             int(m) for m in os.environ.get("FERTILIZE_MONTHS", "3,4,5,6,7,8").split(",") if m.strip().isdigit()
         ]
 
-        # Direct push / WhatsApp channels (in addition to Home Assistant notify services).
-        self.ntfy_topic = os.environ.get("NTFY_TOPIC", "")
-        self.ntfy_server = os.environ.get("NTFY_SERVER", "https://ntfy.sh")
-        self.whatsapp_phone = os.environ.get("WHATSAPP_PHONE", "")
-        self.whatsapp_apikey = os.environ.get("WHATSAPP_APIKEY", "")
-
 
 settings = Settings()

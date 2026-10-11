@@ -77,6 +77,12 @@ class SettingsOut(BaseModel):
     notify_time: str
     notify_services: list[str]
     email_to: list[str]
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_from: str
+    smtp_tls: bool
     ha_weather_entity: str
     ha_outdoor_temp_entity: str
     ha_indoor_temp_entity: str
@@ -86,16 +92,18 @@ class SettingsOut(BaseModel):
     plantnet_project: str
     plantnet_lang: str
     fertilize_months: list[int]
-    ntfy_topic: str
-    ntfy_server: str
-    whatsapp_phone: str
-    whatsapp_apikey: str
 
 
 class SettingsUpdate(BaseModel):
     notify_time: str | None = None
     notify_services: list[str] | None = None
     email_to: list[str] | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_tls: bool | None = None
     ha_weather_entity: str | None = None
     ha_outdoor_temp_entity: str | None = None
     ha_indoor_temp_entity: str | None = None
@@ -105,10 +113,6 @@ class SettingsUpdate(BaseModel):
     plantnet_project: str | None = None
     plantnet_lang: str | None = None
     fertilize_months: list[int] | None = None
-    ntfy_topic: str | None = None
-    ntfy_server: str | None = None
-    whatsapp_phone: str | None = None
-    whatsapp_apikey: str | None = None
 
 
 class IdentificationCandidate(BaseModel):
