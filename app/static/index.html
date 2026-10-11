@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Home Plants</title>
+  <link rel="icon" href="static/favicon.png?v=1.0.9" />
+  <link rel="stylesheet" href="static/style.css?v=1.0.9" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="leaf">🌿</span>
+      <h1>Home Plants</h1>
+    </div>
+    <div class="actions">
+      <span id="ha-status" class="status-pill" title="Home Assistant connection">HA</span>
+      <button id="btn-identify-all" class="ghost" title="Identify all plant photos with Pl@ntNet">Identify all</button>
+      <button id="btn-settings" class="ghost">Settings</button>
+      <button id="btn-add" class="primary">+ Add plant</button>
+    </div>
+  </header>
+
+  <section id="weather" class="weather-bar hidden"></section>
+
+  <nav class="filters">
+    <button data-filter="due" class="active">Needs water</button>
+    <button data-filter="sick">Sick</button>
+    <button data-filter="all">All plants</button>
+    <button data-filter="ok">Happy</button>
+  </nav>
+
+  <main id="grid" class="grid"></main>
+  <p id="empty" class="empty hidden">No plants here yet. Add your first one.</p>
+
+  <!-- Plant editor -->
+  <div id="plant-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="plant-modal-title">Add plant</h2>
+      <form id="plant-form">
+        <input type="hidden" id="plant-id" />
+        <div class="photo-row">
+          <img id="photo-preview" class="photo-preview" alt="" />
+          <div>
+            <label class="file-label">
+              Photo
+              <input type="file" id="plant-photo" accept="image/*" />
+            </label>
+          </div>
+        </div>
+        <div class="identify-row">
+          <select id="identify-organ">
+            <option value="auto">Auto-detect organ</option>
+            <option value="leaf">Leaf</option>
+            <option value="flower">Flower</option>
+            <option value="fruit">Fruit</option>
+            <option value="bark">Bark</option>
+          </select>
+          <button type="button" class="ghost" id="btn-identify">🔍 Identify</button>
+        </div>
+        <div id="identify-results" class="identify-results"></div>
+        <label>Name<input id="plant-name" required /></label>
+        <label>Species<input id="plant-species" placeholder="e.g. Spathiphyllum wallisii" /></label>
+        <div class="two">
+          <label>Location<input id="plant-location" placeholder="e.g. Living room" /></label>
+          <label>Placement
+            <select id="plant-placement">
+              <option value="indoor">Indoor</option>
+              <option value="outdoor">Outdoor</option>
+            </select>
+          </label>
+        </div>
+        <label>Water every (days)<input id="plant-interval" type="number" min="1" max="400" value="7" /></label>
+        <label>Fertilize every (days, 0 = never)<input id="plant-fert-interval" type="number" min="0" max="400" value="30" /></label>
+        <label class="check"><input type="checkbox" id="plant-sick" /> Currently sick (daily check-up)</label>
+        <label>Symptoms / treatment<textarea id="plant-sick-note" rows="2"></textarea></label>
+        <label>Notes<textarea id="plant-notes" rows="2"></textarea></label>
+        <div class="two">
+          <label>Status
+            <select id="plant-status">
+              <option value="">Automatic</option>
+              <option value="ok">Happy</option>
+              <option value="due">Needs water</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </label>
+          <label>Last watered<input id="plant-last-watered" type="datetime-local" /></label>
+        </div>
+        <label class="check"><input type="checkbox" id="plant-active" checked /> Active</label>
+        <div class="modal-actions">
+          <button type="button" class="ghost" data-close>Cancel</button>
+          <button type="submit" class="primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Settings</h2>
+      <form id="settings-form">
+        <label>Daily reminder time<input id="set-notify-time" type="time" /></label>
+        <label>Timezone<input id="set-timezone" placeholder="e.g. Europe/Madrid" /></label>
+        <h3 class="settings-sub">Fertilizing</h3>
+        <label>Reminder months (1-12, comma separated)<input id="set-fert-months" placeholder="3,4,5,6,7,8" /></label>
+        <label>Notify services (comma separated)<input id="set-notify-services" autocomplete="off" placeholder="notify.mobile_app_phone" /></label>
+        <label>Email recipients (comma separated)<input id="set-email-to" placeholder="me@example.com" /></label>
+        <h3 class="settings-sub">Push / WhatsApp</h3>
+        <label>ntfy topic (push app)<input id="set-ntfy-topic" autocomplete="off" placeholder="e.g. my-plants" /></label>
+        <label>ntfy server<input id="set-ntfy-server" autocomplete="off" placeholder="https://ntfy.sh" /></label>
+        <label>WhatsApp number (CallMeBot, with country code)<input id="set-wa-phone" autocomplete="off" placeholder="+34600123456" /></label>
+        <label>WhatsApp API key (CallMeBot)<input id="set-wa-apikey" type="password" autocomplete="off" /></label>
+        <h3 class="settings-sub">Rooms &amp; sensors</h3>
+        <div id="rooms-list" class="rooms-list"></div>
+        <div class="room-add">
+          <select id="room-name"><option value="">Select room…</option></select>
+          <select id="room-temp"><option value="">Temperature sensor…</option></select>
+          <select id="room-hum"><option value="">Humidity sensor…</option></select>
+          <button type="button" class="ghost" id="btn-add-room">+ Save room sensors</button>
+        </div>
+        <button type="button" class="ghost" id="btn-detect" style="margin-bottom:8px">🪄 Auto-detect entities</button>
+        <label>Weather entity<select id="set-weather"></select></label>
+        <label>Outdoor temperature entity<select id="set-outdoor"></select></label>
+        <label>Indoor temperature entity<select id="set-indoor"></select></label>
+        <label>Rain entity<select id="set-rain"></select></label>
+        <h3 class="settings-sub">Pl@ntNet identification</h3>
+        <label>API key<input id="set-plantnet-key" type="password" placeholder="from my.plantnet.org" autocomplete="off" /></label>
+        <label>Project / flora<input id="set-plantnet-project" placeholder="all" /></label>
+        <label>Language<input id="set-plantnet-lang" placeholder="en" /></label>
+        <div class="modal-actions">
+          <button type="button" class="ghost" id="btn-test">Send test</button>
+          <button type="button" class="ghost" data-close>Close</button>
+          <button type="submit" class="primary">Save</button>
+        </div>
+      </form>
+      <p id="settings-msg" class="msg"></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="static/app.js?v=1.0.9"></script>
+</body>
+</html>
