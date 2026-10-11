@@ -579,25 +579,44 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-function fillMonthSelect(selected) {
-  const sel = $("set-fert-months");
+function fillMonthChecks(selected) {
+  const box = $("set-fert-months");
   const chosen = new Set((selected || []).map(Number));
-  sel.innerHTML = MONTH_NAMES.map(
-    (name, i) => `<option value="${i + 1}"${chosen.has(i + 1) ? " selected" : ""}>${name}</option>`
+  box.innerHTML = MONTH_NAMES.map(
+    (name, i) =>
+      `<label class="check"><input type="checkbox" value="${i + 1}"${
+        chosen.has(i + 1) ? " checked" : ""
+      } /> ${name}</label>`
   ).join("");
 }
 
 async function fillNotifyServices(selected) {
+  const box = $("set-notify-services");
+  const chosen = new Set(selected || []);
   let items = [];
   try {
     const services = await api("/api/ha/notify-services");
-    items = (services || [])
-      .filter((s) => s.startsWith("notify.mobile_app_"))
-      .map((s) => ({ value: s, label: s }));
+    items = (services || []).filter((s) => s.startsWith("notify.mobile_app_"));
   } catch (err) {
-    /* ignore — leave the picker empty */
+    /* ignore — leave the list empty */
   }
-  fillSelect("set-notify-services", items, (selected || [])[0] || "");
+  // Keep any already-saved service that HA no longer reports.
+  chosen.forEach((s) => {
+    if (!items.includes(s)) items.push(s);
+  });
+  if (!items.length) {
+    box.innerHTML = `<span class="hint">No notify.mobile_app_* services found in Home Assistant.</span>`;
+    return;
+  }
+  items.sort();
+  box.innerHTML = items
+    .map((s) => {
+      const label = s.replace(/^notify\.mobile_app_/, "").replace(/_/g, " ").trim() || s;
+      return `<label class="check" title="${escapeHTML(s)}"><input type="checkbox" value="${escapeHTML(
+        s
+      )}"${chosen.has(s) ? " checked" : ""} /> ${escapeHTML(label)}</label>`;
+    })
+    .join("");
 }
 
 async function openSettings() {
@@ -606,7 +625,7 @@ async function openSettings() {
     await loadEntityPickers(s);
     $("set-notify-time").value = s.notify_time || "08:00";
     $("set-timezone").value = s.timezone || "";
-    fillMonthSelect(s.fertilize_months);
+    fillMonthChecks(s.fertilize_months);
     await fillNotifyServices(s.notify_services);
     $("set-email-to").value = (s.email_to || []).join(", ");
     $("set-smtp-host").value = s.smtp_host || "";
@@ -634,12 +653,13 @@ async function openSettings() {
 async function saveSettings(event) {
   event.preventDefault();
   const splitList = (v) => v.split(",").map((s) => s.trim()).filter(Boolean);
-  const notifyService = $("set-notify-services").value;
+  const checkedValues = (id) =>
+    [...$(id).querySelectorAll("input[type=checkbox]:checked")].map((i) => i.value);
   const payload = {
     notify_time: $("set-notify-time").value,
     timezone: $("set-timezone").value.trim(),
-    fertilize_months: [...$("set-fert-months").selectedOptions].map((o) => Number(o.value)),
-    notify_services: notifyService ? [notifyService] : [],
+    fertilize_months: checkedValues("set-fert-months").map(Number),
+    notify_services: checkedValues("set-notify-services"),
     email_to: splitList($("set-email-to").value),
     smtp_host: $("set-smtp-host").value.trim(),
     smtp_port: Number($("set-smtp-port").value) || 587,

@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home Plants</title>
-  <link rel="icon" href="static/favicon.png?v=1.1.0" />
-  <link rel="stylesheet" href="static/style.css?v=1.1.0" />
+  <link rel="icon" href="static/favicon.png?v=1.1.1" />
+  <link rel="stylesheet" href="static/style.css?v=1.1.1" />
 </head>
 <body>
   <header class="topbar">
@@ -106,8 +106,10 @@
         <label>Daily reminder time<input id="set-notify-time" type="time" /></label>
         <label>Timezone<input id="set-timezone" placeholder="e.g. Europe/Madrid" /></label>
         <h3 class="settings-sub">Fertilizing</h3>
-        <label>Reminder months (select one or more)<select id="set-fert-months" multiple size="6"></select></label>
-        <label>Notify service<select id="set-notify-services"></select></label>
+        <label>Reminder months</label>
+        <div id="set-fert-months" class="checks"></div>
+        <label>Notify services (Home Assistant mobile app)</label>
+        <div id="set-notify-services" class="checks"></div>
         <h3 class="settings-sub">Email (SMTP)</h3>
         <label>Email recipients (comma separated)<input id="set-email-to" placeholder="me@example.com" /></label>
         <label>SMTP host<input id="set-smtp-host" autocomplete="off" placeholder="smtp.gmail.com" /></label>
@@ -138,6 +140,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="static/app.js?v=1.1.0"></script>
+  <script src="static/app.js?v=1.1.1"></script>
 </body>
 </html>

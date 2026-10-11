@@ -529,3 +529,11 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   (<reason>)`) instead of a bare yes/no, so failures are diagnosable.
 - Add-on options/schema gained `smtp_*` (and `run.sh` exports them); README
   documents the Gmail app-password setup. Version bumped to **1.1.0**.
+
+### 1.1.1 — Checkbox pickers
+- **Reminder months** is now a row of twelve **checkboxes** (Jan–Dec) instead of
+  a multi-select list box.
+- **Notify services** now shows a **checkbox per `notify.mobile_app_*` service**,
+  so several phones/services can be ticked at once (same style as the months).
+- Added a `.checks` grid style and a checkbox reset so the boxes are not padded
+  like text inputs. Version bumped to **1.1.1**.

@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Home Plants", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="Home Plants", version="1.1.1", lifespan=lifespan)
 
 
 @app.middleware("http")
