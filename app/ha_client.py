@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import json
 import logging
+import time
 
 import httpx
+import websockets
 from sqlalchemy.orm import Session
 
 from .config import settings as env_settings
 from . import store
 
 log = logging.getLogger("plants.ha")
+
+# Room discovery talks to the HA WebSocket API (area/device/entity registries).
+# The result is cached briefly because every plant-list request resolves rooms.
+_ROOMS_TTL = 60.0
+_rooms_cache: dict = {"at": 0.0, "rooms": []}
 
 
 class HAClient:
@@ -89,6 +97,128 @@ class HAClient:
         except httpx.HTTPError as exc:
             log.warning("Failed to list Home Assistant states: %s", exc)
             return []
+
+    def _ws_url(self) -> str:
+        url = self._url()
+        if url.startswith("https://"):
+            return "wss://" + url[len("https://"):] + "/api/websocket"
+        if url.startswith("http://"):
+            return "ws://" + url[len("http://"):] + "/api/websocket"
+        return url.rstrip("/") + "/api/websocket"
+
+    async def _ws_registries(self) -> dict:
+        """Read the area / device / entity registries over the HA WebSocket API.
+
+        The REST API does not expose areas, so this is the only way to learn which
+        sensors belong to which room. Returns empty lists if it can't connect.
+        """
+        empty = {"areas": [], "devices": [], "entities": []}
+        if not self._url() or not self._token():
+            return empty
+        try:
+            async with websockets.connect(
+                self._ws_url(), open_timeout=10, close_timeout=5
+            ) as ws:
+                hello = json.loads(await ws.recv())
+                if hello.get("type") == "auth_required":
+                    await ws.send(
+                        json.dumps({"type": "auth", "access_token": self._token()})
+                    )
+                    auth = json.loads(await ws.recv())
+                else:
+                    auth = hello
+                if auth.get("type") != "auth_ok":
+                    log.warning("Home Assistant WebSocket auth failed (%s)", auth.get("type"))
+                    return empty
+                out: dict = {}
+                commands = [
+                    ("config/area_registry/list", "areas"),
+                    ("config/device_registry/list", "devices"),
+                    ("config/entity_registry/list", "entities"),
+                ]
+                for mid, (command, key) in enumerate(commands, start=1):
+                    await ws.send(json.dumps({"id": mid, "type": command}))
+                    while True:
+                        msg = json.loads(await ws.recv())
+                        if msg.get("id") == mid and msg.get("type") == "result":
+                            out[key] = msg.get("result") or []
+                            break
+                return {**empty, **out}
+        except Exception as exc:  # noqa: BLE001 - network/JSON/protocol errors
+            log.warning("Failed to read Home Assistant registries: %s", exc)
+            return empty
+
+    async def get_rooms(self, states: dict | None = None) -> list[dict]:
+        """Rooms (HA areas) with the temperature/humidity sensors linked to them.
+
+        Each room is ``{area_id, name, temperature_sensors, humidity_sensors}``
+        where each sensor is ``{entity_id, name}``. An entity is linked to an area
+        directly or through the device it belongs to.
+        """
+        now = time.monotonic()
+        if _rooms_cache["rooms"] and now - _rooms_cache["at"] < _ROOMS_TTL:
+            return _rooms_cache["rooms"]
+
+        registries = await self._ws_registries()
+        areas = registries.get("areas") or []
+        if not areas:
+            _rooms_cache.update(at=now, rooms=[])
+            return []
+
+        if states is None:
+            states = {s.get("entity_id"): s for s in await self.get_all_states()}
+
+        device_area = {d.get("id"): d.get("area_id") for d in registries.get("devices") or []}
+        entity_area: dict[str, str] = {}
+        for entry in registries.get("entities") or []:
+            entity_id = entry.get("entity_id")
+            if not entity_id:
+                continue
+            area = entry.get("area_id") or device_area.get(entry.get("device_id"))
+            if area:
+                entity_area[entity_id] = area
+
+        rooms: dict[str, dict] = {}
+        for area in areas:
+            area_id = area.get("id") or area.get("area_id")
+            if not area_id:
+                continue
+            rooms[area_id] = {
+                "area_id": area_id,
+                "name": area.get("name") or area_id,
+                "temperature_sensors": [],
+                "humidity_sensors": [],
+            }
+
+        for entity_id, area_id in entity_area.items():
+            room = rooms.get(area_id)
+            if not room or not entity_id.startswith("sensor."):
+                continue
+            state = states.get(entity_id)
+            if not state:
+                continue
+            attrs = state.get("attributes", {})
+            device_class = attrs.get("device_class")
+            unit = attrs.get("unit_of_measurement")
+            item = {"entity_id": entity_id, "name": attrs.get("friendly_name") or entity_id}
+            # Prefer device_class; only fall back to the unit when it's absent so we
+            # don't mistake e.g. a battery (unit "%", device_class "battery") for a
+            # humidity sensor.
+            if device_class == "temperature":
+                room["temperature_sensors"].append(item)
+            elif device_class == "humidity":
+                room["humidity_sensors"].append(item)
+            elif not device_class and unit in ("°C", "°F", "K"):
+                room["temperature_sensors"].append(item)
+            elif not device_class and unit == "%":
+                room["humidity_sensors"].append(item)
+
+        result = sorted(rooms.values(), key=lambda r: (r["name"] or "").lower())
+        for room in result:
+            room["temperature_sensors"].sort(key=lambda s: s["name"].lower())
+            room["humidity_sensors"].sort(key=lambda s: s["name"].lower())
+        _rooms_cache.update(at=now, rooms=result)
+        return result
 
     async def get_notify_services(self) -> list[str]:
         url = f"{self._url()}/api/services"

@@ -23,7 +23,9 @@ def _months(db: Session) -> list[int]:
     return store.get_value(db, "fertilize_months", env_settings.fertilize_months) or []
 
 
-def _to_out(plant: Plant, env: dict, months: list[int] | None = None) -> PlantOut:
+def _to_out(
+    plant: Plant, env: dict, months: list[int] | None = None, rooms: dict | None = None
+) -> PlantOut:
     res = compute_watering(plant, env)
     fert = compute_fertilize(plant, months or [])
     return PlantOut(
@@ -32,6 +34,11 @@ def _to_out(plant: Plant, env: dict, months: list[int] | None = None) -> PlantOu
         species=plant.species,
         location=plant.location,
         placement=plant.placement,
+        room_id=plant.room_id,
+        room_name=plant.room_name,
+        temp_entity=plant.temp_entity,
+        humidity_entity=plant.humidity_entity,
+        sensor_warning=environment.sensor_warning(plant, rooms or {}),
         base_interval_days=plant.base_interval_days,
         fertilize_interval_days=plant.fertilize_interval_days,
         is_sick=bool(plant.is_sick),
@@ -56,7 +63,7 @@ def _to_out(plant: Plant, env: dict, months: list[int] | None = None) -> PlantOu
 
 async def _env_result(db: Session, plant: Plant) -> PlantOut:
     env, states, rooms = await environment.collect(db)
-    return _to_out(plant, environment.resolve(plant, env, states, rooms), _months(db))
+    return _to_out(plant, environment.resolve(plant, env, states, rooms), _months(db), rooms)
 
 
 @router.get("", response_model=list[PlantOut])
@@ -64,7 +71,7 @@ async def list_plants(db: Session = Depends(get_db)):
     months = _months(db)
     plants = db.query(Plant).order_by(Plant.name).all()
     env, states, rooms = await environment.collect(db)
-    return [_to_out(p, environment.resolve(p, env, states, rooms), months) for p in plants]
+    return [_to_out(p, environment.resolve(p, env, states, rooms), months, rooms) for p in plants]
 
 
 @router.post("", response_model=PlantOut, status_code=201)

@@ -43,6 +43,12 @@ async def ha_entities(db: Session = Depends(get_db)):
     return out
 
 
+@router.get("/ha/rooms")
+async def ha_rooms(db: Session = Depends(get_db)):
+    """Home Assistant areas (rooms) with their temperature/humidity sensors."""
+    return await HAClient(db).get_rooms()
+
+
 @router.get("/status")
 async def status(db: Session = Depends(get_db)):
     env, states, rooms = await environment.collect(db)

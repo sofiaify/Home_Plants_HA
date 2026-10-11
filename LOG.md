@@ -481,3 +481,23 @@ that bump (1.0.0 is everything built up to the first deploy).
   Y humidity`, or the load error) so empty dropdowns can be debugged without the
   browser console.
 - Removed a duplicate auto-detect call and stopped clearing that message.
+
+### 1.0.10 — Rooms come from Home Assistant
+Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
+- `ha_client.HAClient.get_rooms()` reads the **area / device / entity
+  registries** over the **HA WebSocket API** (`websockets` dep added) and returns
+  each room with its temperature/humidity sensors (entity linked to the area
+  directly or via its device). Cached ~60 s. New `GET /api/ha/rooms`.
+- `Plant` gained `room_id`, `room_name`, `temp_entity`, `humidity_entity`;
+  `location` is kept in sync with the room name for display/notifications.
+- The **plant editor** now picks a Room from a dropdown; the app then shows the
+  room's sensors: one of each → names shown; several → choose from dropdowns;
+  none → warning (still savable). `environment.resolve` uses the plant's chosen
+  sensors (or the room's only sensor) instead of matching free-text locations.
+- Plants whose room has no temperature **or** humidity sensor (or no room) show
+  a **⚠️ badge** on their card (`PlantOut.sensor_warning`).
+- Removed `app/routers/rooms.py`, the `Room` model and the Settings
+  "Rooms & sensors" section. Simulator (`sim/mock_ha.py`) now serves a minimal
+  HA **WebSocket** endpoint plus sample areas/sensors (Living Room with two temp
+  + two humidity sensors, Bedroom with one, Bathroom with none) for testing all
+  three cases.

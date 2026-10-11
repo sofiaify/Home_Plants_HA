@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .bootstrap import ensure_seeded, prepare_data_dir
 from .config import PHOTO_DIR, settings
 from .models import SessionLocal, init_db
-from .routers import identify, plants, rooms, system
+from .routers import identify, plants, system
 from .scheduler import start as start_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -59,7 +59,6 @@ async def no_store(request, call_next):
     return response
 
 app.include_router(plants.router)
-app.include_router(rooms.router)
 app.include_router(identify.router)
 app.include_router(system.router)
 

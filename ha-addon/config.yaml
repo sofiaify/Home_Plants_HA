@@ -1,5 +1,5 @@
 name: "Home Plants"
-version: "1.0.9"
+version: "1.0.10"
 slug: "plants"
 description: "Track your houseplants, get watering reminders, and auto-adjust schedules from weather."
 url: "https://github.com/your/plants-app"

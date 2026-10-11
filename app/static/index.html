@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home Plants</title>
-  <link rel="icon" href="static/favicon.png?v=1.0.9" />
-  <link rel="stylesheet" href="static/style.css?v=1.0.9" />
+  <link rel="icon" href="static/favicon.png?v=1.0.10" />
+  <link rel="stylesheet" href="static/style.css?v=1.0.10" />
 </head>
 <body>
   <header class="topbar">
@@ -62,7 +62,9 @@
         <label>Name<input id="plant-name" required /></label>
         <label>Species<input id="plant-species" placeholder="e.g. Spathiphyllum wallisii" /></label>
         <div class="two">
-          <label>Location<input id="plant-location" placeholder="e.g. Living room" /></label>
+          <label>Room
+            <select id="plant-room"><option value="">Select a room…</option></select>
+          </label>
           <label>Placement
             <select id="plant-placement">
               <option value="indoor">Indoor</option>
@@ -70,6 +72,7 @@
             </select>
           </label>
         </div>
+        <div id="room-sensors" class="room-sensors hidden"></div>
         <label>Water every (days)<input id="plant-interval" type="number" min="1" max="400" value="7" /></label>
         <label>Fertilize every (days, 0 = never)<input id="plant-fert-interval" type="number" min="0" max="400" value="30" /></label>
         <label class="check"><input type="checkbox" id="plant-sick" /> Currently sick (daily check-up)</label>
@@ -111,14 +114,6 @@
         <label>ntfy server<input id="set-ntfy-server" autocomplete="off" placeholder="https://ntfy.sh" /></label>
         <label>WhatsApp number (CallMeBot, with country code)<input id="set-wa-phone" autocomplete="off" placeholder="+34600123456" /></label>
         <label>WhatsApp API key (CallMeBot)<input id="set-wa-apikey" type="password" autocomplete="off" /></label>
-        <h3 class="settings-sub">Rooms &amp; sensors</h3>
-        <div id="rooms-list" class="rooms-list"></div>
-        <div class="room-add">
-          <select id="room-name"><option value="">Select room…</option></select>
-          <select id="room-temp"><option value="">Temperature sensor…</option></select>
-          <select id="room-hum"><option value="">Humidity sensor…</option></select>
-          <button type="button" class="ghost" id="btn-add-room">+ Save room sensors</button>
-        </div>
         <button type="button" class="ghost" id="btn-detect" style="margin-bottom:8px">🪄 Auto-detect entities</button>
         <label>Weather entity<select id="set-weather"></select></label>
         <label>Outdoor temperature entity<select id="set-outdoor"></select></label>
@@ -139,6 +134,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="static/app.js?v=1.0.9"></script>
+  <script src="static/app.js?v=1.0.10"></script>
 </body>
 </html>

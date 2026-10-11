@@ -10,6 +10,10 @@ class PlantBase(BaseModel):
     species: str | None = Field(default=None, max_length=160)
     location: str = ""
     placement: str = "indoor"
+    room_id: str = ""
+    room_name: str = ""
+    temp_entity: str = ""
+    humidity_entity: str = ""
     base_interval_days: int = Field(default=7, ge=1, le=400)
     fertilize_interval_days: int = Field(default=30, ge=0, le=400)
     is_sick: bool = False
@@ -28,6 +32,10 @@ class PlantUpdate(BaseModel):
     species: str | None = None
     location: str | None = None
     placement: str | None = None
+    room_id: str | None = None
+    room_name: str | None = None
+    temp_entity: str | None = None
+    humidity_entity: str | None = None
     base_interval_days: int | None = Field(default=None, ge=1, le=400)
     fertilize_interval_days: int | None = Field(default=None, ge=0, le=400)
     is_sick: bool | None = None
@@ -36,26 +44,6 @@ class PlantUpdate(BaseModel):
     last_watered: datetime | None = None
     notes: str | None = None
     active: bool | None = None
-
-
-class RoomBase(BaseModel):
-    name: str = Field(..., max_length=120)
-    temp_entity: str = ""
-    humidity_entity: str = ""
-
-
-class RoomCreate(RoomBase):
-    pass
-
-
-class RoomUpdate(BaseModel):
-    name: str | None = None
-    temp_entity: str | None = None
-    humidity_entity: str | None = None
-
-
-class RoomOut(RoomBase):
-    id: int
 
 
 class PlantOut(PlantBase):
@@ -73,6 +61,7 @@ class PlantOut(PlantBase):
     fertilize_days_until: float | None = None
     fertilize_status: str = "off"
     fertilize_in_season: bool = False
+    sensor_warning: bool = False
 
 
 class WaterRequest(BaseModel):

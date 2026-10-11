@@ -135,6 +135,7 @@ button.ghost:hover { background: #eef3ec; }
 .badge.ok { background: #e2f2e2; color: var(--green-dark); }
 .badge.inactive { background: #eceaea; color: var(--muted); }
 .badge.sick { background: #f7dbe3; color: #b23a55; }
+.badge.warn { background: #fdf1cf; color: #9a6a10; }
 
 .badges { display: flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; }
 .card.is-sick { border-color: #e6b3c0; }
@@ -209,25 +210,28 @@ button.ghost:hover { background: #eef3ec; }
 
 .settings-sub { margin: 8px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 
-.rooms-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.room-item {
+.room-sensors {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
+  margin: -2px 0 4px;
+}
+.room-sensors .sensor-note {
+  font-size: 13px;
   background: #f4f8f3;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 10px;
-  font-size: 13px;
 }
-.room-item .room-name { font-weight: 600; }
-.room-item .room-sensors { color: var(--muted); font-size: 12px; flex: 1; }
-.room-add { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.room-add input { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfa; }
-.room-add #room-name { grid-column: 1 / -1; }
-.room-add button { grid-column: 1 / -1; }
-
-.room-item.pending { background: #fdf6e3; border-color: #f0e2b8; }
+.room-sensors .sensor-note.muted { color: var(--muted); }
+.room-sensors .sensor-warning {
+  font-size: 13px;
+  background: #fdf6e3;
+  border: 1px solid #f0e2b8;
+  color: #8a6410;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
 
 .ac-list {
   position: fixed;

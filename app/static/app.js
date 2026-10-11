@@ -4,6 +4,10 @@ const state = {
   env: {},
   editingPhotoFile: null,
   identifyCandidates: [],
+  rooms: [],
+  editTemp: "",
+  editHum: "",
+  editRoomName: "",
 };
 
 const BASE = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/";
@@ -105,6 +109,9 @@ function cardHTML(plant) {
     ? `<div class="reason">⤵ ${plant.adjustment_reason} · every ${plant.effective_interval_days}d</div>`
     : `<div class="reason">every ${plant.effective_interval_days}d</div>`;
   const sickBadge = plant.is_sick ? `<span class="badge sick">🤒 Sick</span>` : "";
+  const warnBadge = plant.sensor_warning
+    ? `<span class="badge warn" title="No temperature or humidity sensors linked to this plant's room">⚠️</span>`
+    : "";
   const fertLine = plant.fertilize_interval_days > 0
     ? `<div class="fert ${plant.fertilize_status === "overdue" || plant.fertilize_status === "due" ? "due" : ""}">🌱 ${fertilizeText(plant)}</div>`
     : "";
@@ -116,7 +123,7 @@ function cardHTML(plant) {
     <div class="card ${plant.is_sick ? "is-sick" : ""}" data-id="${plant.id}">
       <img class="photo" src="${photo}" alt="${plant.name}" loading="lazy" />
       <div class="body">
-        <div class="badges"><span class="badge ${plant.status}">${statusLabel(plant.status)}</span>${sickBadge}</div>
+        <div class="badges"><span class="badge ${plant.status}">${statusLabel(plant.status)}</span>${sickBadge}${warnBadge}</div>
         <h3>${escapeHTML(plant.name)}</h3>
         ${plant.species ? `<div class="species">${escapeHTML(plant.species)}</div>` : ""}
         <div class="loc">${plant.placement === "outdoor" ? "🌤" : "🏠"} ${escapeHTML(plant.location || "Unplaced")}</div>
@@ -179,6 +186,88 @@ function renderWeather() {
   ).join("");
   bar.innerHTML = parts.join("") + (forecast ? `<div class="forecast">${forecast}</div>` : "");
   bar.classList.remove("hidden");
+}
+
+async function loadHaRooms(force = false) {
+  if (!force && state.rooms.length) return state.rooms;
+  try {
+    state.rooms = (await api("/api/ha/rooms")) || [];
+  } catch (err) {
+    state.rooms = [];
+  }
+  return state.rooms;
+}
+
+function roomById(id) {
+  return state.rooms.find((r) => r.area_id === id) || null;
+}
+
+function fillRoomSelect(selectedId) {
+  const sel = $("plant-room");
+  const rooms = state.rooms;
+  sel.innerHTML =
+    `<option value="">No room</option>` +
+    rooms.map((r) => `<option value="${escapeHTML(r.area_id)}">${escapeHTML(r.name)}</option>`).join("");
+  if (selectedId && !rooms.some((r) => r.area_id === selectedId)) {
+    sel.innerHTML += `<option value="${escapeHTML(selectedId)}">${escapeHTML(selectedId)} (not in HA)</option>`;
+  }
+  sel.value = selectedId || "";
+  renderRoomSensors();
+}
+
+function sensorOptions(sensors, selected, selectId) {
+  const chosen = sensors.some((s) => s.entity_id === selected) ? selected : sensors[0]?.entity_id;
+  const opts = sensors
+    .map(
+      (s) =>
+        `<option value="${escapeHTML(s.entity_id)}"${s.entity_id === chosen ? " selected" : ""}>${escapeHTML(
+          s.name || s.entity_id
+        )}</option>`
+    )
+    .join("");
+  return `<select id="${selectId}">${opts}</select>`;
+}
+
+function renderRoomSensors() {
+  const box = $("room-sensors");
+  const roomId = $("plant-room").value;
+  const room = roomById(roomId);
+  if (!roomId) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  box.classList.remove("hidden");
+  if (!room) {
+    box.innerHTML = `<div class="sensor-warning">⚠️ This room isn't available in Home Assistant, so no sensors could be looked up. You can still save.</div>`;
+    return;
+  }
+  const temps = room.temperature_sensors || [];
+  const hums = room.humidity_sensors || [];
+  if (!temps.length && !hums.length) {
+    box.innerHTML = `<div class="sensor-warning">⚠️ No temperature or humidity sensors are linked to <strong>${escapeHTML(
+      room.name
+    )}</strong>. You can still save — the plant will show a warning until sensors are added in Home Assistant.</div>`;
+    return;
+  }
+  const tempField = temps.length
+    ? temps.length === 1
+      ? `<div class="sensor-note">🌡 <strong>${escapeHTML(temps[0].name)}</strong></div>`
+      : `<label>Temperature sensor${sensorOptions(temps, state.editTemp, "plant-temp-entity")}</label>`
+    : `<div class="sensor-note muted">🌡 No temperature sensor in this room.</div>`;
+  const humField = hums.length
+    ? hums.length === 1
+      ? `<div class="sensor-note">💧 <strong>${escapeHTML(hums[0].name)}</strong></div>`
+      : `<label>Humidity sensor${sensorOptions(hums, state.editHum, "plant-hum-entity")}</label>`
+    : `<div class="sensor-note muted">💧 No humidity sensor in this room.</div>`;
+  box.innerHTML = tempField + humField;
+}
+
+function pickSensorEntity(sensors, selectId) {
+  if (!sensors || !sensors.length) return "";
+  if (sensors.length === 1) return sensors[0].entity_id;
+  const sel = $(selectId);
+  return sel ? sel.value : "";
 }
 
 async function loadAll() {
@@ -262,16 +351,27 @@ async function fertilizePlant(id) {
   }
 }
 
-function openPlantModal(id = null) {
+async function openPlantModal(id = null) {
   state.editingPhotoFile = null;
   state.identifyCandidates = [];
   const plant = id ? state.plants.find((p) => p.id === id) : null;
+  state.editTemp = plant?.temp_entity || "";
+  state.editHum = plant?.humidity_entity || "";
+  state.editRoomName = plant?.room_name || plant?.location || "";
+  await loadHaRooms(true);
+  let roomId = plant?.room_id || "";
+  if (!roomId && plant?.location) {
+    const match = state.rooms.find(
+      (r) => (r.name || "").trim().toLowerCase() === plant.location.trim().toLowerCase()
+    );
+    if (match) roomId = match.area_id;
+  }
   $("plant-modal-title").textContent = plant ? "Edit plant" : "Add plant";
   $("plant-id").value = plant ? plant.id : "";
   $("plant-name").value = plant ? plant.name : "";
   $("plant-species").value = plant?.species || "";
-  $("plant-location").value = plant?.location || "";
   $("plant-placement").value = plant?.placement || "indoor";
+  fillRoomSelect(roomId);
   $("plant-interval").value = plant?.base_interval_days || 7;
   $("plant-fert-interval").value = plant ? plant.fertilize_interval_days ?? 30 : 30;
   $("plant-sick").checked = plant ? !!plant.is_sick : false;
@@ -290,11 +390,16 @@ function openPlantModal(id = null) {
 async function savePlant(event) {
   event.preventDefault();
   const id = $("plant-id").value;
+  const room = roomById($("plant-room").value);
   const payload = {
     name: $("plant-name").value.trim(),
     species: $("plant-species").value.trim() || null,
-    location: $("plant-location").value.trim(),
+    location: room ? room.name : state.editRoomName,
     placement: $("plant-placement").value,
+    room_id: $("plant-room").value,
+    room_name: room ? room.name : state.editRoomName,
+    temp_entity: room ? pickSensorEntity(room.temperature_sensors, "plant-temp-entity") : state.editTemp,
+    humidity_entity: room ? pickSensorEntity(room.humidity_sensors, "plant-hum-entity") : state.editHum,
     base_interval_days: Number($("plant-interval").value) || 7,
     fertilize_interval_days: Math.max(0, Number($("plant-fert-interval").value) || 0),
     is_sick: $("plant-sick").checked,
@@ -391,109 +496,6 @@ async function identifyAll() {
   }
 }
 
-async function loadRooms() {
-  try {
-    const rooms = await api("/api/rooms");
-    renderRooms(rooms);
-    fillRoomNameOptions(rooms);
-  } catch (err) {
-    /* ignore */
-  }
-}
-
-function fillRoomNameOptions(rooms) {
-  const locs = new Set();
-  (state.plants || []).forEach((p) => {
-    const l = (p.location || "").trim();
-    if (l) locs.add(l);
-  });
-  (rooms || []).forEach((r) => {
-    const n = (r.name || "").trim();
-    if (n) locs.add(n);
-  });
-  const sel = $("room-name");
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML =
-    `<option value="">Select room…</option>` +
-    [...locs].sort().map((l) => `<option value="${escapeHTML(l)}">${escapeHTML(l)}</option>`).join("");
-  if (current) sel.value = current;
-}
-
-function renderRooms(rooms) {
-  const box = $("rooms-list");
-  const usedLocs = [...new Set((state.plants || []).map((p) => (p.location || "").trim()).filter(Boolean))];
-  const configured = new Set(rooms.map((r) => (r.name || "").trim().toLowerCase()));
-  const parts = [];
-
-  rooms.forEach((r) => {
-    parts.push(`<div class="room-item" data-id="${r.id}">
-      <span class="room-name">${escapeHTML(r.name)}</span>
-      <span class="room-sensors">🌡 ${escapeHTML(r.temp_entity || "—")}<br>💧 ${escapeHTML(r.humidity_entity || "—")}</span>
-      <button type="button" class="ghost icon-btn room-del" data-id="${r.id}" title="Delete">✕</button>
-    </div>`);
-  });
-
-  usedLocs
-    .filter((loc) => !configured.has(loc.toLowerCase()))
-    .forEach((loc) => {
-      parts.push(`<div class="room-item pending">
-      <span class="room-name">${escapeHTML(loc)}</span>
-      <span class="room-sensors">used by your plants · no sensors yet</span>
-      <button type="button" class="ghost icon-btn room-config" data-name="${escapeHTML(loc)}" title="Add sensors">＋</button>
-    </div>`);
-    });
-
-  if (!parts.length) {
-    box.innerHTML = `<p class="hint">No rooms yet — set a plant's Location, then add its sensors here.</p>`;
-    return;
-  }
-  box.innerHTML = parts.join("");
-  box.querySelectorAll(".room-del").forEach((b) =>
-    b.addEventListener("click", () => deleteRoom(Number(b.dataset.id)))
-  );
-  box.querySelectorAll(".room-config").forEach((b) =>
-    b.addEventListener("click", () => {
-      $("room-name").value = b.dataset.name;
-      $("room-temp").focus();
-    })
-  );
-}
-
-async function addRoom() {
-  const name = $("room-name").value.trim();
-  if (!name) {
-    toast("Pick a room");
-    return;
-  }
-  const payload = { temp_entity: $("room-temp").value, humidity_entity: $("room-hum").value };
-  try {
-    const rooms = await api("/api/rooms");
-    const existing = rooms.find((r) => (r.name || "").trim().toLowerCase() === name.toLowerCase());
-    if (existing) {
-      await api(`/api/rooms/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-    } else {
-      await api("/api/rooms", { method: "POST", body: JSON.stringify({ name, ...payload }) });
-    }
-    $("room-temp").value = "";
-    $("room-hum").value = "";
-    toast("Room sensors saved");
-    loadRooms();
-  } catch (err) {
-    toast("Failed: " + err.message);
-  }
-}
-
-async function deleteRoom(id) {
-  try {
-    await api(`/api/rooms/${id}`, { method: "DELETE" });
-    toast("Room removed");
-    loadRooms();
-  } catch (err) {
-    toast("Failed: " + err.message);
-  }
-}
-
 async function detectEntities(silent = false) {
   try {
     const s = await api("/api/ha/suggest");
@@ -531,66 +533,9 @@ async function getEntityItems() {
 }
 
 const isWeatherEnt = (e) => e.domain === "weather";
-const isTempEnt = (e) => e.device_class === "temperature" || ["°C", "°F", "K"].includes(e.unit) || /temp|temperature/.test(e.hay);
-const isHumEnt = (e) => e.device_class === "humidity" || e.unit === "%" || /humid|humidity|\bhum\b/.test(e.hay);
+const isTempEnt = (e) => e.device_class === "temperature" || (!e.device_class && ["°C", "°F", "K"].includes(e.unit)) || /temp|temperature/.test(e.hay);
+const isHumEnt = (e) => e.device_class === "humidity" || (!e.device_class && (e.unit === "%" || /humid|humidity|\bhum\b/.test(e.hay)));
 const isRainEnt = (e) => String(e.device_class || "").startsWith("precipitation") || ["mm", "in"].includes(e.unit) || /rain|precip/.test(e.hay);
-
-function roomNameItems() {
-  const locs = [...new Set((state.plants || []).map((p) => (p.location || "").trim()).filter(Boolean))];
-  return locs.map((loc) => ({ value: loc, label: loc }));
-}
-
-// A small autocomplete dropdown we control, so it works on every browser (Safari included).
-function makeAutocomplete(input, getItems) {
-  if (!input || input.dataset.ac === "1") return;
-  input.dataset.ac = "1";
-  input.setAttribute("autocomplete", "off");
-  const box = document.createElement("div");
-  box.className = "ac-list hidden";
-  document.body.appendChild(box);
-
-  const close = () => box.classList.add("hidden");
-  const place = () => {
-    const r = input.getBoundingClientRect();
-    box.style.left = `${r.left}px`;
-    box.style.top = `${r.bottom + 2}px`;
-    box.style.width = `${Math.max(r.width, 200)}px`;
-  };
-  const open = () => {
-    const filter = input.value.trim().toLowerCase();
-    const items = getItems().filter(
-      (it) => !filter || it.value.toLowerCase().includes(filter) || (it.label || "").toLowerCase().includes(filter)
-    );
-    if (!items.length) {
-      close();
-      return;
-    }
-    box.innerHTML = items
-      .slice(0, 60)
-      .map(
-        (it) =>
-          `<div class="ac-item" data-value="${escapeHTML(it.value)}"><span>${escapeHTML(
-            it.label || it.value
-          )}</span><span class="ac-id">${escapeHTML(it.value)}</span></div>`
-      )
-      .join("");
-    box.querySelectorAll(".ac-item").forEach((el) =>
-      el.addEventListener("mousedown", (ev) => {
-        ev.preventDefault();
-        input.value = el.dataset.value;
-        close();
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      })
-    );
-    place();
-    box.classList.remove("hidden");
-  };
-
-  input.addEventListener("focus", open);
-  input.addEventListener("input", open);
-  input.addEventListener("blur", () => setTimeout(close, 120));
-  window.addEventListener("resize", close);
-}
 
 function fillSelect(id, items, selected) {
   const sel = $(id);
@@ -618,9 +563,6 @@ async function loadEntityPickers(settings) {
   fillSelect("set-outdoor", pick(isTempEnt), settings?.ha_outdoor_temp_entity);
   fillSelect("set-indoor", pick(isTempEnt), settings?.ha_indoor_temp_entity);
   fillSelect("set-rain", pick(isRainEnt), settings?.ha_rain_entity);
-  fillSelect("room-temp", pick(isTempEnt), "");
-  fillSelect("room-hum", pick(isHumEnt), "");
-  makeAutocomplete($("plant-location"), roomNameItems);
   const tempN = items.filter(isTempEnt).length;
   const humN = items.filter(isHumEnt).length;
   $("settings-msg").textContent = error
@@ -648,7 +590,6 @@ async function openSettings() {
     $("set-ntfy-server").value = s.ntfy_server || "";
     $("set-wa-phone").value = s.whatsapp_phone || "";
     $("set-wa-apikey").value = s.whatsapp_apikey || "";
-    loadRooms();
     $("settings-modal").classList.remove("hidden");
     if (!$("set-weather").value && !$("set-outdoor").value && !$("set-indoor").value) {
       detectEntities(true);
@@ -704,7 +645,7 @@ function init() {
   $("btn-identify").addEventListener("click", identifyPlant);
   $("btn-identify-all").addEventListener("click", identifyAll);
   $("btn-detect").addEventListener("click", () => detectEntities(false));
-  $("btn-add-room").addEventListener("click", addRoom);
+  $("plant-room").addEventListener("change", renderRoomSensors);
   $("plant-form").addEventListener("submit", savePlant);
   $("settings-form").addEventListener("submit", saveSettings);
   $("btn-test").addEventListener("click", testNotification);

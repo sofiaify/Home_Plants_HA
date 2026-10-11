@@ -32,8 +32,8 @@ a **Docker container**, or directly with **Python** for development.
   endpoint) reverses the last watering.
 - **Manual control** — override a plant's status (Happy / Needs water / Overdue)
   or correct its *last watered* date from the editor.
-- **Per-room sensors** — define rooms with their own temperature and humidity
-  sensors; indoor plants use their room's sensors for scheduling.
+- **Rooms from Home Assistant** — pick a plant's HA area; the app reads the
+  temperature/humidity sensors linked to that room and uses them for scheduling.
 - **Notifications** — Home Assistant push (`notify.mobile_app_*`), **ntfy**,
   **WhatsApp** (CallMeBot), Telegram or email.
 - **Home Assistant sidebar panel** — installed as an add-on with **ingress**, the
@@ -256,11 +256,22 @@ Use the **Send test** button to confirm delivery.
 
 ### Rooms & sensors
 
-Open **Settings → Rooms & sensors** to add a room with its temperature and
-humidity sensors (autocompleted from Home Assistant). Then set a plant's
-**Location** to the room name (the editor suggests existing room names). Indoor
-plants use their room's sensors; if a room has no sensors, the global indoor
-temperature and weather humidity are used.
+Rooms come straight from Home Assistant — they are the **areas** in the area
+registry, and the app discovers each room's temperature/humidity sensors by
+reading the entity/device registries over the HA WebSocket API.
+
+In the **plant editor**, pick the plant's **Room** from the dropdown. The app
+then looks up the sensors linked to that room:
+
+- **One temperature + one humidity sensor** — their names are shown and used
+  automatically.
+- **Several sensors** — a dropdown appears for each so you can choose the one
+  that applies to this plant.
+- **No sensors** — a warning is shown but you can still save; the plant's card
+  then displays a ⚠️ badge until sensors are linked to the room in HA.
+
+Only indoor plants use room sensors; outdoor plants still use the outdoor
+temperature/weather from Settings.
 
 ### Adding Telegram / email
 
@@ -343,8 +354,7 @@ All endpoints are under `/api`. Interactive docs are available at `/docs`
 | POST   | `/api/plants/{id}/sick`     | Mark a plant sick (optional note)    |
 | POST   | `/api/plants/{id}/healthy`  | Mark a plant healthy again           |
 | POST   | `/api/plants/{id}/fertilize`| Mark a plant as fertilized           |
-| GET/POST | `/api/rooms`              | List / create rooms (with sensors)   |
-| PATCH/DELETE | `/api/rooms/{id}`     | Update / delete a room               |
+| GET    | `/api/ha/rooms`             | HA areas (rooms) + their sensors     |
 | GET    | `/api/ha/notify-services`   | List HA notify.* services            |
 | GET    | `/api/ha/suggest`           | Suggested entity IDs for settings    |
 | GET    | `/api/plants/{id}/history`  | Watering history                     |
@@ -417,6 +427,6 @@ All endpoints are under `/api`. Interactive docs are available at `/docs`
 ## Possible next steps
 
 - Rain-based delays using the `weather.*` forecast precipitation.
-- Per-room temperature sensors mapped to plant locations.
+- Per-area sensor overrides / fallbacks when an area has several sensors.
 - Per-plant moisture sensors for true soil-based scheduling.
 - Snooze / skip-a-watering and seasonal profiles.
