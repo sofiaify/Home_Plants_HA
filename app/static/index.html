@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home Plants</title>
-  <link rel="icon" href="static/favicon.png?v=1.4.0" />
-  <link rel="stylesheet" href="static/style.css?v=1.4.0" />
+  <link rel="icon" href="static/favicon.png?v=1.4.1" />
+  <link rel="stylesheet" href="static/style.css?v=1.4.1" />
 </head>
 <body>
   <header class="topbar">
@@ -39,18 +39,15 @@
   <div id="plant-modal" class="modal hidden">
     <div class="modal-card plant-editor">
       <h2 id="plant-modal-title">Add plant</h2>
-      <div class="plant-hero">
-        <div class="hero-photo">
-          <img id="photo-preview" alt="" />
-          <label class="hero-edit" title="Change main photo">✎ Edit
-            <input type="file" id="plant-photo" accept="image/*" />
-          </label>
-        </div>
-        <div class="hero-info">
-          <h2 id="plant-hero-name">Name</h2>
-          <div id="plant-hero-species" class="hero-species">Scientific name</div>
-          <ul id="plant-summary-list" class="summary-list"></ul>
-        </div>
+      <div class="hero-info">
+        <h2 id="plant-hero-name">Name</h2>
+        <div id="plant-hero-species" class="hero-species">Scientific name</div>
+      </div>
+      <div class="hero-photo">
+        <img id="photo-preview" alt="" />
+        <label class="hero-edit" title="Change main photo">✎ Edit
+          <input type="file" id="plant-photo" accept="image/*" />
+        </label>
       </div>
       <div class="gallery-section">
         <h3 class="gallery-title">Gallery</h3>
@@ -61,6 +58,7 @@
           </label>
         </div>
       </div>
+      <ul id="plant-summary-list" class="summary-list"></ul>
       <form id="plant-form">
         <input type="hidden" id="plant-id" />
         <div class="identify-row">
@@ -155,6 +153,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="static/app.js?v=1.4.0"></script>
+  <script src="static/app.js?v=1.4.1"></script>
 </body>
 </html>

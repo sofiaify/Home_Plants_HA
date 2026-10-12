@@ -263,13 +263,14 @@ button.ghost:hover { background: #eef3ec; }
 
 .file-label { font-size: 13px; color: var(--muted); }
 
-/* Plant editor hero (photo + name + status summary) */
-.plant-hero { display: flex; gap: 18px; align-items: flex-start; }
+/* Plant editor hero: name, then full-width photo, gallery, summary */
+.hero-info { display: flex; flex-direction: column; margin-bottom: 12px; }
+.hero-info h2 { margin: 0; font-size: clamp(24px, 4vw, 34px); line-height: 1.05; }
+.hero-species { font-style: italic; color: var(--muted); font-size: 16px; margin: 2px 0 0; }
 .hero-photo {
   position: relative;
-  flex: 0 0 auto;
-  width: 220px;
-  height: 220px;
+  width: 100%;
+  height: 280px;
   border-radius: 14px;
   overflow: hidden;
   background: #eef3ec;
@@ -277,20 +278,17 @@ button.ghost:hover { background: #eef3ec; }
 .hero-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .hero-edit {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 10px;
+  bottom: 10px;
   background: var(--green);
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 5px 11px;
+  padding: 7px 16px;
   border-radius: 8px;
   cursor: pointer;
 }
 .hero-edit input { display: none; }
-.hero-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.hero-info h2 { margin: 0; font-size: clamp(22px, 3vw, 30px); line-height: 1.1; }
-.hero-species { font-style: italic; color: var(--muted); font-size: 15px; margin: 2px 0 10px; }
 .summary-list {
   list-style: none;
   margin: 0;
@@ -335,8 +333,8 @@ button.ghost:hover { background: #eef3ec; }
 .gallery-add input { display: none; }
 
 @media (max-width: 560px) {
-  .plant-hero { flex-direction: column; }
-  .hero-photo { width: 100%; height: 200px; }
+  .hero-photo { height: 220px; }
+  .gallery-item, .gallery-add { width: 64px; height: 64px; }
 }
 
 .identify-row { display: flex; gap: 10px; }

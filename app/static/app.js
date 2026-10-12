@@ -219,7 +219,7 @@ function renderPlants() {
 }
 
 const CAL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const CAL_MONTHS = 3;
+const CAL_MONTHS = 2;
 
 function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();

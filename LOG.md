@@ -588,3 +588,10 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   effective interval (`next_due + k·interval`), so it follows the schedule — and
   because it's derived from `next_due`, watering a plant shifts the dates forward.
 - Version bumped to **1.4.0**.
+
+### 1.4.1 — Vertical editor layout & shorter calendar
+- **Editor** is now fully vertical (matches the mock and works on mobile):
+  NAME → scientific name → full-width photo with **Edit** → **Gallery** → status
+  box → settings. Removed the side-by-side hero.
+- **Calendar** shows only the **current month and the next one** (2 months).
+- Version bumped to **1.4.1**.
