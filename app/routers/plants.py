@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -10,13 +11,21 @@ from ..config import PHOTO_DIR
 from ..config import settings as env_settings
 from .. import environment, store
 from ..ha_client import HAClient
-from ..models import Plant, WateringEvent, get_db
-from ..schemas import PlantCreate, PlantOut, PlantUpdate, SickRequest, WaterRequest
+from ..models import Plant, PlantPhoto, WateringEvent, get_db
+from ..schemas import (
+    PlantCreate,
+    PlantOut,
+    PlantPhotoOut,
+    PlantUpdate,
+    SickRequest,
+    WaterRequest,
+)
 from ..watering import as_utc, compute_fertilize, compute_watering
 
 router = APIRouter(prefix="/api/plants", tags=["plants"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+IMAGE_SUFFIX = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
 
 
 def _months(db: Session) -> list[int]:
@@ -46,6 +55,7 @@ def _to_out(
         notes=plant.notes,
         active=bool(plant.active),
         photo=plant.photo,
+        photos=[PlantPhotoOut(id=ph.id, filename=ph.filename) for ph in plant.photos],
         last_watered=as_utc(plant.last_watered),
         next_due=res.next_due,
         days_until_due=res.days_until_due,
@@ -221,20 +231,79 @@ async def upload_photo(plant_id: int, file: UploadFile = File(...), db: Session 
     plant = db.get(Plant, plant_id)
     if not plant:
         raise HTTPException(404, "Plant not found")
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+    suffix = IMAGE_SUFFIX.get(file.content_type)
+    if not suffix:
         raise HTTPException(400, "Unsupported image type")
 
-    suffix = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}[
-        file.content_type
-    ]
     if plant.photo:
         stale = PHOTO_DIR / plant.photo
-        if stale.exists():
+        # Only remove the old cover if it isn't one of the gallery photos.
+        gallery = {ph.filename for ph in plant.photos}
+        if plant.photo not in gallery and stale.exists():
             stale.unlink()
     filename = f"plant-{plant.id}{suffix}"
     with open(PHOTO_DIR / filename, "wb") as out:
         shutil.copyfileobj(file.file, out)
     plant.photo = filename
+    db.commit()
+    db.refresh(plant)
+    return await _env_result(db, plant)
+
+
+@router.post("/{plant_id}/photos", response_model=PlantOut)
+async def add_photo(plant_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    plant = db.get(Plant, plant_id)
+    if not plant:
+        raise HTTPException(404, "Plant not found")
+    suffix = IMAGE_SUFFIX.get(file.content_type)
+    if not suffix:
+        raise HTTPException(400, "Unsupported image type")
+    filename = f"plant-{plant.id}-{uuid4().hex[:10]}{suffix}"
+    with open(PHOTO_DIR / filename, "wb") as out:
+        shutil.copyfileobj(file.file, out)
+    db.add(PlantPhoto(plant_id=plant.id, filename=filename))
+    db.commit()
+    db.refresh(plant)
+    return await _env_result(db, plant)
+
+
+@router.delete("/{plant_id}/photos/{photo_id}", response_model=PlantOut)
+async def delete_photo(plant_id: int, photo_id: int, db: Session = Depends(get_db)):
+    plant = db.get(Plant, plant_id)
+    if not plant:
+        raise HTTPException(404, "Plant not found")
+    photo = db.get(PlantPhoto, photo_id)
+    if not photo or photo.plant_id != plant_id:
+        raise HTTPException(404, "Photo not found")
+    path = PHOTO_DIR / photo.filename
+    db.delete(photo)
+    db.commit()
+    if path.exists():
+        path.unlink()
+    db.refresh(plant)
+    return await _env_result(db, plant)
+
+
+@router.post("/{plant_id}/photos/{photo_id}/cover", response_model=PlantOut)
+async def set_cover(plant_id: int, photo_id: int, db: Session = Depends(get_db)):
+    plant = db.get(Plant, plant_id)
+    if not plant:
+        raise HTTPException(404, "Plant not found")
+    photo = db.get(PlantPhoto, photo_id)
+    if not photo or photo.plant_id != plant_id:
+        raise HTTPException(404, "Photo not found")
+    source = PHOTO_DIR / photo.filename
+    if not source.exists():
+        raise HTTPException(404, "Photo file missing")
+    suffix = source.suffix
+    if plant.photo:
+        stale = PHOTO_DIR / plant.photo
+        gallery = {ph.filename for ph in plant.photos}
+        if plant.photo not in gallery and stale.exists():
+            stale.unlink()
+    cover = f"plant-{plant.id}{suffix}"
+    shutil.copyfile(source, PHOTO_DIR / cover)
+    plant.photo = cover
     db.commit()
     db.refresh(plant)
     return await _env_result(db, plant)

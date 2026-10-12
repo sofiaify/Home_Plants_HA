@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home Plants</title>
-  <link rel="icon" href="static/favicon.png?v=1.2.0" />
-  <link rel="stylesheet" href="static/style.css?v=1.2.0" />
+  <link rel="icon" href="static/favicon.png?v=1.3.0" />
+  <link rel="stylesheet" href="static/style.css?v=1.3.0" />
 </head>
 <body>
   <header class="topbar">
@@ -39,17 +39,22 @@
   <div id="plant-modal" class="modal hidden">
     <div class="modal-card">
       <h2 id="plant-modal-title">Add plant</h2>
-      <form id="plant-form">
-        <input type="hidden" id="plant-id" />
+      <div class="plant-summary">
         <div class="photo-row">
           <img id="photo-preview" class="photo-preview" alt="" />
-          <div>
-            <label class="file-label">
-              Photo
-              <input type="file" id="plant-photo" accept="image/*" />
-            </label>
+          <div class="photo-main">
+            <label class="file-label">Main photo<input type="file" id="plant-photo" accept="image/*" /></label>
+            <div id="gallery-wrap" class="gallery-wrap hidden">
+              <div class="gallery-title">Gallery</div>
+              <div id="gallery" class="gallery"></div>
+              <label class="file-label">Add photos<input type="file" id="gallery-photo" accept="image/*" multiple /></label>
+            </div>
           </div>
         </div>
+        <ul id="plant-summary-list" class="summary-list"></ul>
+      </div>
+      <form id="plant-form">
+        <input type="hidden" id="plant-id" />
         <div class="identify-row">
           <select id="identify-organ">
             <option value="auto">Auto-detect organ</option>
@@ -142,6 +147,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="static/app.js?v=1.2.0"></script>
+  <script src="static/app.js?v=1.3.0"></script>
 </body>
 </html>

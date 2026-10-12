@@ -49,6 +49,9 @@ class Plant(Base):
     events: Mapped[list["WateringEvent"]] = relationship(
         back_populates="plant", cascade="all, delete-orphan", order_by="WateringEvent.watered_at.desc()"
     )
+    photos: Mapped[list["PlantPhoto"]] = relationship(
+        back_populates="plant", cascade="all, delete-orphan", order_by="PlantPhoto.id"
+    )
 
 
 class WateringEvent(Base):
@@ -63,6 +66,21 @@ class WateringEvent(Base):
     note: Mapped[str] = mapped_column(Text, default="")
 
     plant: Mapped[Plant] = relationship(back_populates="events")
+
+
+class PlantPhoto(Base):
+    """Extra gallery photos for a plant (the main photo is ``Plant.photo``)."""
+
+    __tablename__ = "plant_photos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plant_id: Mapped[int] = mapped_column(ForeignKey("plants.id", ondelete="CASCADE"))
+    filename: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    plant: Mapped[Plant] = relationship(back_populates="photos")
 
 
 class Setting(Base):

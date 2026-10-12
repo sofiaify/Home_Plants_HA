@@ -76,23 +76,6 @@ function statusLabel(status) {
   }[status] || status;
 }
 
-function fertilizeText(plant) {
-  if (!plant.fertilize_in_season) return "feeding off-season";
-  const d = plant.fertilize_days_until;
-  if (d === null || d === undefined) return "feed due";
-  if (d < 0) return `feed overdue ${Math.abs(Math.round(d))}d`;
-  if (d < 1) return "feed today";
-  return `feed in ${Math.round(d)}d`;
-}
-
-function hydrationDot(plant) {
-  const f = plant.hydration_factor;
-  if (f === null || f === undefined) return { cls: "neutral", title: "No temperature/humidity sensors" };
-  if (f > 1.01) return { cls: "good", title: "Temperature/humidity help keep the soil moist" };
-  if (f < 0.99) return { cls: "dry", title: "Temperature/humidity are drying the plant out" };
-  return { cls: "neutral", title: "Temperature/humidity are neutral" };
-}
-
 function nextWateringText(plant) {
   const d = plant.days_until_due;
   if (d === null || d === undefined) return "Never watered yet";
@@ -103,9 +86,58 @@ function nextWateringText(plant) {
   return `In ${r} days`;
 }
 
-function fertilizerText(plant) {
-  if (plant.fertilize_interval_days <= 0) return "no feeding schedule";
-  return fertilizeText(plant);
+function lastWateredText(iso) {
+  if (!iso) return "not watered yet";
+  const then = new Date(iso);
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
+// Countdown colour: green >7d, yellow 3-7d, red <3d (incl. overdue).
+function waterDot(plant) {
+  const d = plant.days_until_due;
+  if (d === null || d === undefined) return { cls: "neutral", title: "Never watered" };
+  if (d > 7) return { cls: "good", title: "More than a week until watering" };
+  if (d >= 3) return { cls: "warn", title: "Water in 3-7 days" };
+  return { cls: "dry", title: "Water in less than 3 days" };
+}
+
+// Whether the weather is improving or worsening the soil moisture.
+function weatherTrend(plant) {
+  const f = plant.adjustment_factor;
+  if (f === null || f === undefined || (f >= 0.99 && f <= 1.01))
+    return { cls: "neutral", arrow: "→", word: "steady" };
+  if (f > 1) return { cls: "up", arrow: "⇈", word: "improving soil moisture" };
+  return { cls: "down", arrow: "⇊", word: "drying the soil faster" };
+}
+
+function weatherReason(plant) {
+  const r = plant.adjustment_reason;
+  return r && r !== "season baseline" ? r : "stable conditions";
+}
+
+function weatherText(plant) {
+  const t = weatherTrend(plant);
+  return `${t.arrow} ${t.word} (${weatherReason(plant)})`;
+}
+
+function feedLineText(plant) {
+  if (!plant.fertilize_in_season) return "Not in this season";
+  if (plant.fertilize_interval_days <= 0) return "No feeding schedule";
+  const d = plant.fertilize_days_until;
+  if (d === null || d === undefined) return "Feed due";
+  if (d < 0) return `Feed overdue ${Math.abs(Math.round(d))}d`;
+  if (d < 1) return "Feed today";
+  return `Next feed in ${Math.round(d)}d`;
+}
+
+function healthText(plant) {
+  const parts = [statusLabel(plant.status)];
+  if (plant.is_sick) parts.push("sick 🤒");
+  if (plant.sensor_warning) parts.push("missing room sensors ⚠️");
+  return parts.join(" · ");
 }
 
 function cardHTML(plant) {
@@ -115,19 +147,22 @@ function cardHTML(plant) {
   const warnBadge = plant.sensor_warning
     ? `<span class="badge warn" title="No temperature or humidity sensors linked to this plant's room">⚠️</span>`
     : "";
-  const hyd = hydrationDot(plant);
+  const feedBadge = `<span class="badge ${plant.fertilize_in_season ? "fert-in" : "fert-off"}">🌱 Feed season</span>`;
+  const wd = waterDot(plant);
+  const wt = weatherTrend(plant);
   const fertDue = plant.fertilize_status === "overdue" || plant.fertilize_status === "due";
   const sickNote = plant.is_sick && plant.sick_note ? `<div class="sick-note">${escapeHTML(plant.sick_note)}</div>` : "";
   return `
     <div class="card ${plant.is_sick ? "is-sick" : ""}" data-id="${plant.id}">
       <img class="photo" src="${photo}" alt="${plant.name}" loading="lazy" />
       <div class="body">
-        <div class="badges"><span class="badge ${plant.status}">${statusLabel(plant.status)}</span>${sickBadge}${warnBadge}</div>
+        <div class="badges"><span class="badge ${plant.status}">${statusLabel(plant.status)}</span>${sickBadge}${warnBadge}${feedBadge}</div>
         <h3>${escapeHTML(plant.name)}</h3>
         ${plant.species ? `<div class="species">${escapeHTML(plant.species)}</div>` : ""}
         <div class="loc">${plant.placement === "outdoor" ? "🌤" : "🏠"} ${escapeHTML(plant.location || "Unplaced")}</div>
-        <div class="next"><span class="hyd-dot ${hyd.cls}" title="${escapeHTML(hyd.title)}"></span><span>${nextWateringText(plant)}</span></div>
-        <div class="fert ${fertDue ? "due" : ""}">🌱 ${escapeHTML(fertilizerText(plant))}</div>
+        <div class="countdown"><span class="hyd-dot ${wd.cls}" title="${escapeHTML(wd.title)}"></span><span>${nextWateringText(plant)}</span></div>
+        <div class="weather ${wt.cls}" title="${escapeHTML(weatherText(plant))}"><span class="arrows">${wt.arrow}</span><span>${escapeHTML(weatherReason(plant))}</span></div>
+        <div class="fert ${fertDue ? "due" : ""}">🌱 ${escapeHTML(feedLineText(plant))}</div>
         ${sickNote}
         <div class="row">
           <button class="primary water-btn">${showOk ? "💧 Water" : "💧 Mark watered"}</button>
@@ -184,45 +219,22 @@ function renderPlants() {
 }
 
 const CAL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const CAL_MONTHS = 3;
 
 function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function renderCalendar() {
-  const box = $("calendar");
-  const base = state.calendarMonth || new Date();
-  const year = base.getFullYear();
-  const month = base.getMonth();
+function monthGrid(year, month, byDay, today) {
   const startWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Monday first
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-  const byDay = {};
-  (state.plants || []).forEach((plant) => {
-    if (!plant.next_due) return;
-    let due = new Date(plant.next_due);
-    if (isNaN(due)) return;
-    due = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-    if (due < startOfToday) due = startOfToday; // overdue -> show today
-    if (due.getFullYear() === year && due.getMonth() === month) {
-      (byDay[due.getDate()] = byDay[due.getDate()] || []).push(plant);
-    }
-  });
-
-  const monthName = base.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  let html = `<div class="cal-head">
-    <button type="button" class="ghost cal-nav" data-step="-1">‹</button>
-    <h2>${escapeHTML(monthName)}</h2>
-    <button type="button" class="ghost cal-nav" data-step="1">›</button>
-  </div><div class="cal-grid">`;
+  let html = `<div class="cal-grid">`;
   CAL_WEEKDAYS.forEach((wd) => { html += `<div class="cal-wd">${wd}</div>`; });
   for (let i = 0; i < startWeekday; i++) html += `<div class="cal-cell empty"></div>`;
   for (let day = 1; day <= daysInMonth; day++) {
     const cellDate = new Date(year, month, day);
     const isToday = sameDay(cellDate, today);
-    const plants = byDay[day] || [];
+    const plants = byDay[`${year}-${month}-${day}`] || [];
     const chips = plants
       .map((p) => `<button type="button" class="cal-plant ${p.status}" data-id="${p.id}" title="${escapeHTML(
         `${p.name}: ${nextWateringText(p)}`
@@ -233,17 +245,56 @@ function renderCalendar() {
       <div class="cal-plants">${chips}</div>
     </div>`;
   }
+  const total = startWeekday + daysInMonth;
+  for (let i = 0; i < (7 - (total % 7)) % 7; i++) html += `<div class="cal-cell empty"></div>`;
+  html += `</div>`;
+  return html;
+}
+
+function renderCalendar() {
+  const box = $("calendar");
+  const base = state.calendarMonth || new Date();
+  const start = new Date(base.getFullYear(), base.getMonth(), 1);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const byDay = {};
+  (state.plants || []).forEach((plant) => {
+    if (!plant.next_due) return;
+    let due = new Date(plant.next_due);
+    if (isNaN(due)) return;
+    due = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+    if (due < startOfToday) due = startOfToday; // overdue -> show today
+    const key = `${due.getFullYear()}-${due.getMonth()}-${due.getDate()}`;
+    (byDay[key] = byDay[key] || []).push(plant);
+  });
+
+  let html = `<div class="cal-head">
+    <button type="button" class="ghost cal-nav" data-step="-1">‹</button>
+    <h2>Watering schedule</h2>
+    <button type="button" class="ghost cal-nav" data-step="1">›</button>
+  </div><div class="cal-months">`;
+  for (let m = 0; m < CAL_MONTHS; m++) {
+    const d = new Date(start.getFullYear(), start.getMonth() + m, 1);
+    html += `<div class="cal-month">
+      <h3>${escapeHTML(d.toLocaleDateString(undefined, { month: "long", year: "numeric" }))}</h3>
+      ${monthGrid(d.getFullYear(), d.getMonth(), byDay, today)}
+    </div>`;
+  }
   html += `</div>`;
   box.innerHTML = html;
 
   box.querySelectorAll(".cal-nav").forEach((btn) =>
     btn.addEventListener("click", () => {
-      state.calendarMonth = new Date(year, month + Number(btn.dataset.step), 1);
+      state.calendarMonth = new Date(start.getFullYear(), start.getMonth() + Number(btn.dataset.step), 1);
       renderCalendar();
     })
   );
   box.querySelectorAll(".cal-plant").forEach((chip) =>
-    chip.addEventListener("click", () => openPlantModal(Number(chip.dataset.id)))
+    chip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPlantModal(Number(chip.dataset.id));
+    })
   );
 }
 
@@ -429,6 +480,111 @@ async function fertilizePlant(id) {
   }
 }
 
+function renderPlantSummary(plant) {
+  const list = $("plant-summary-list");
+  if (!plant) {
+    list.innerHTML = `<li class="hint">New plant — save it to see its watering schedule and add gallery photos.</li>`;
+    return;
+  }
+  list.innerHTML = `
+    <li>💧 <strong>Next watering:</strong> ${escapeHTML(nextWateringText(plant))}</li>
+    <li>🕓 <strong>Last watered:</strong> ${escapeHTML(lastWateredText(plant.last_watered))}</li>
+    <li>🌡 <strong>Weather:</strong> ${escapeHTML(weatherText(plant))}</li>
+    <li>📍 <strong>Location:</strong> ${escapeHTML(plant.location || "Unplaced")} (${escapeHTML(plant.placement)})</li>
+    <li>❤️ <strong>Health:</strong> ${escapeHTML(healthText(plant))}</li>`;
+}
+
+function renderGallery(plant) {
+  const wrap = $("gallery-wrap");
+  const box = $("gallery");
+  if (!plant) {
+    wrap.classList.add("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+  const photos = plant.photos || [];
+  if (!photos.length) {
+    box.innerHTML = `<span class="hint">No gallery photos yet.</span>`;
+    return;
+  }
+  box.innerHTML = photos
+    .map(
+      (ph) => `<div class="gallery-item">
+        <img src="${asset(`photos/${ph.filename}`)}" alt="" loading="lazy" />
+        <div class="gallery-actions">
+          <button type="button" class="ghost icon-btn gallery-cover" data-id="${ph.id}" title="Use as main photo">★</button>
+          <button type="button" class="ghost icon-btn gallery-del" data-id="${ph.id}" title="Delete photo">✕</button>
+        </div>
+      </div>`
+    )
+    .join("");
+  box.querySelectorAll(".gallery-cover").forEach((b) =>
+    b.addEventListener("click", () => setGalleryCover(Number(b.dataset.id)))
+  );
+  box.querySelectorAll(".gallery-del").forEach((b) =>
+    b.addEventListener("click", () => deleteGalleryPhoto(Number(b.dataset.id)))
+  );
+}
+
+async function refreshEditedPlant() {
+  const id = Number($("plant-id").value);
+  if (!id) return;
+  try {
+    const plant = await api(`/api/plants/${id}`);
+    const idx = state.plants.findIndex((p) => p.id === id);
+    if (idx >= 0) state.plants[idx] = plant;
+    else state.plants.push(plant);
+    $("photo-preview").src = plant.photo ? asset(`photos/${plant.photo}`) : asset("static/placeholder.svg");
+    renderGallery(plant);
+    renderPlantSummary(plant);
+    loadAll();
+  } catch (err) {
+    toast("Refresh failed: " + err.message);
+  }
+}
+
+async function uploadGalleryPhotos(files) {
+  const id = Number($("plant-id").value);
+  if (!id) {
+    toast("Save the plant first to add gallery photos");
+    return;
+  }
+  for (const file of files) {
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      await api(`/api/plants/${id}/photos`, { method: "POST", body: form });
+    } catch (err) {
+      toast("Upload failed: " + err.message);
+    }
+  }
+  refreshEditedPlant();
+}
+
+async function deleteGalleryPhoto(photoId) {
+  const id = Number($("plant-id").value);
+  if (!id || !confirm("Delete this photo?")) return;
+  try {
+    await api(`/api/plants/${id}/photos/${photoId}`, { method: "DELETE" });
+    toast("Photo removed");
+    refreshEditedPlant();
+  } catch (err) {
+    toast("Failed: " + err.message);
+  }
+}
+
+async function setGalleryCover(photoId) {
+  const id = Number($("plant-id").value);
+  if (!id) return;
+  try {
+    await api(`/api/plants/${id}/photos/${photoId}/cover`, { method: "POST" });
+    toast("Main photo updated");
+    refreshEditedPlant();
+  } catch (err) {
+    toast("Failed: " + err.message);
+  }
+}
+
 async function openPlantModal(id = null) {
   state.editingPhotoFile = null;
   state.identifyCandidates = [];
@@ -461,6 +617,9 @@ async function openPlantModal(id = null) {
   $("plant-photo").value = "";
   const preview = $("photo-preview");
   preview.src = plant?.photo ? asset(`photos/${plant.photo}`) : asset("static/placeholder.svg");
+  renderGallery(plant);
+  renderPlantSummary(plant);
+  $("gallery-photo").value = "";
   $("identify-results").innerHTML = "";
   $("plant-modal").classList.remove("hidden");
 }
@@ -785,6 +944,11 @@ function init() {
     if (!file) return;
     state.editingPhotoFile = file;
     $("photo-preview").src = URL.createObjectURL(file);
+  });
+  $("gallery-photo").addEventListener("change", (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (files.length) uploadGalleryPhotos(files);
   });
   document.querySelectorAll("[data-close]").forEach((btn) =>
     btn.addEventListener("click", (e) => e.target.closest(".modal").classList.add("hidden"))

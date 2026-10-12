@@ -46,9 +46,15 @@ class PlantUpdate(BaseModel):
     active: bool | None = None
 
 
+class PlantPhotoOut(BaseModel):
+    id: int
+    filename: str
+
+
 class PlantOut(PlantBase):
     id: int
     photo: str | None = None
+    photos: list[PlantPhotoOut] = []
     last_watered: datetime | None = None
     next_due: datetime | None = None
     effective_interval_days: float | None = None

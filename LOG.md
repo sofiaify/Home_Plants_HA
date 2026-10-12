@@ -562,3 +562,18 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   the three buttons.
 - New `PlantOut.hydration_factor` (temperature × humidity only, excluding
   rain/weather) drives the dot. Version bumped to **1.2.0**.
+
+### 1.3.0 — Card, editor and calendar polish (+ photo gallery)
+- **Card**: added a **🌱 Feed season** badge (green in fertilizing months, red
+  otherwise); a **countdown dot** under the location (green >7 days, yellow 3–7,
+  red <3/overdue); a **weather arrow** (`⇈` green = improving soil moisture,
+  `⇊` red = drying faster) with the reason; and a feeding line that reads the
+  next feed or **"Not in this season"** when off-season.
+- **Editor**: a **status summary** above the settings — main photo + upload,
+  next watering, last watered, weather effect, location and health.
+- **Photo gallery** (new): `PlantPhoto` model + `POST /api/plants/{id}/photos`,
+  `DELETE /api/plants/{id}/photos/{id}` and `POST .../{id}/cover`; `PlantOut`
+  gained `photos`. Add multiple photos, delete them, or set one as the main photo.
+- **Calendar**: shows the next **3 months** (prev/next shifts), fills trailing
+  cells so weeks keep their spacing, and tighter sizing on phones.
+- Version bumped to **1.3.0**.
