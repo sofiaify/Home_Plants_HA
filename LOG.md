@@ -577,3 +577,14 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
 - **Calendar**: shows the next **3 months** (prev/next shifts), fills trailing
   cells so weeks keep their spacing, and tighter sizing on phones.
 - Version bumped to **1.3.0**.
+
+### 1.4.0 — Editor hero layout & 3-watering calendar
+- **Editor hero**: on opening a plant, a big photo with an **✎ Edit** button on the
+  left and the large **name**, italic scientific name and status box (next/last
+  watering, weather, location, health) on the right; then a **Gallery** row
+  (thumbnails + an **Add pictures** tile); then the settings form. Stacks on phones.
+- The feeding line now reads **"Not this season"** when off-season.
+- **Calendar** projects the **next three waterings per plant** by stepping the
+  effective interval (`next_due + k·interval`), so it follows the schedule — and
+  because it's derived from `next_due`, watering a plant shifts the dates forward.
+- Version bumped to **1.4.0**.

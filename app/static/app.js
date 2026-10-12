@@ -124,7 +124,7 @@ function weatherText(plant) {
 }
 
 function feedLineText(plant) {
-  if (!plant.fertilize_in_season) return "Not in this season";
+  if (!plant.fertilize_in_season) return "Not this season";
   if (plant.fertilize_interval_days <= 0) return "No feeding schedule";
   const d = plant.fertilize_days_until;
   if (d === null || d === undefined) return "Feed due";
@@ -259,14 +259,21 @@ function renderCalendar() {
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   const byDay = {};
+  const addOccurrence = (d, plant) => {
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    (byDay[key] = byDay[key] || []).push(plant);
+  };
   (state.plants || []).forEach((plant) => {
     if (!plant.next_due) return;
     let due = new Date(plant.next_due);
     if (isNaN(due)) return;
     due = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-    if (due < startOfToday) due = startOfToday; // overdue -> show today
-    const key = `${due.getFullYear()}-${due.getMonth()}-${due.getDate()}`;
-    (byDay[key] = byDay[key] || []).push(plant);
+    if (due < startOfToday) due = startOfToday; // overdue -> start from today
+    const interval = Number(plant.effective_interval_days || plant.base_interval_days) || 7;
+    // Project the next three waterings following the schedule interval.
+    for (let k = 0; k < 3; k++) {
+      addOccurrence(new Date(due.getTime() + Math.round(k * interval) * 86400000), plant);
+    }
   });
 
   let html = `<div class="cal-head">
@@ -495,14 +502,8 @@ function renderPlantSummary(plant) {
 }
 
 function renderGallery(plant) {
-  const wrap = $("gallery-wrap");
   const box = $("gallery");
-  if (!plant) {
-    wrap.classList.add("hidden");
-    return;
-  }
-  wrap.classList.remove("hidden");
-  const photos = plant.photos || [];
+  const photos = (plant && plant.photos) || [];
   if (!photos.length) {
     box.innerHTML = `<span class="hint">No gallery photos yet.</span>`;
     return;
@@ -604,6 +605,8 @@ async function openPlantModal(id = null) {
   $("plant-id").value = plant ? plant.id : "";
   $("plant-name").value = plant ? plant.name : "";
   $("plant-species").value = plant?.species || "";
+  $("plant-hero-name").textContent = plant ? plant.name : "New plant";
+  $("plant-hero-species").textContent = plant?.species || "";
   $("plant-placement").value = plant?.placement || "indoor";
   fillRoomSelect(roomId);
   $("plant-interval").value = plant?.base_interval_days || 7;
@@ -936,6 +939,12 @@ function init() {
   $("btn-identify-all").addEventListener("click", identifyAll);
   $("btn-detect").addEventListener("click", () => detectEntities(false));
   $("plant-room").addEventListener("change", renderRoomSensors);
+  $("plant-name").addEventListener("input", () => {
+    $("plant-hero-name").textContent = $("plant-name").value.trim() || "Name";
+  });
+  $("plant-species").addEventListener("input", () => {
+    $("plant-hero-species").textContent = $("plant-species").value.trim();
+  });
   $("plant-form").addEventListener("submit", savePlant);
   $("settings-form").addEventListener("submit", saveSettings);
   $("btn-test").addEventListener("click", testNotification);
