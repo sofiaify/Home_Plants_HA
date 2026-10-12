@@ -4,7 +4,8 @@ __pycache__/
 data/
 .env
 .deploy.env
-seed_data/plants.db
+seed_data/
+sim/
 ha-addon/app/
 ha-addon/requirements.txt
 ha-addon/seed_data/
