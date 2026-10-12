@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from . import store
+from . import environment, store
 from .config import settings as env_settings
 from .ha_client import HAClient
 from .models import Plant, Reading, SessionLocal
@@ -45,13 +45,16 @@ async def refresh_environment() -> dict:
 
 async def run_daily_check() -> None:
     with SessionLocal() as db:
-        env = await HAClient(db).get_weather()
+        env, states, rooms = await environment.collect(db)
         plants = db.query(Plant).filter(Plant.active == 1).all()
         now = datetime.now(timezone.utc)
 
-        due = [p for p in plants if compute_watering(p, env).status in {"overdue", "due"}]
+        def env_for(plant: Plant) -> dict:
+            return environment.resolve(plant, env, states, rooms)
+
+        due = [p for p in plants if compute_watering(p, env_for(p)).status in {"overdue", "due"}]
         if due:
-            results = await send_reminders(db, due, env)
+            results = await send_reminders(db, due, env, env_for=env_for)
             log.info("Sent watering reminder for %d plant(s): %s", len(due), results)
 
         sick = [p for p in plants if p.is_sick]

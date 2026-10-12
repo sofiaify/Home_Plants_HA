@@ -67,14 +67,16 @@ async def dispatch(db: Session, title: str, body: str) -> dict:
     return results
 
 
-def build_watering_message(plants_due: list[Plant], env: dict) -> tuple[str, str]:
+def build_watering_message(plants_due: list[Plant], env: dict, env_for=None) -> tuple[str, str]:
+    """Build the reminder. ``env_for(plant)`` can supply a per-plant (room-aware)
+    environment; it falls back to the shared ``env``."""
     title = "Plant watering reminder"
     if len(plants_due) == 1:
         title = f"Water: {plants_due[0].name}"
 
     lines = []
     for plant in plants_due:
-        res = compute_watering(plant, env)
+        res = compute_watering(plant, env_for(plant) if env_for else env)
         if res.days_until_due is None:
             when = "never watered yet"
         elif res.days_until_due < 0:
@@ -163,8 +165,8 @@ def _send_email(config: dict, subject: str, body: str, recipients: list[str]) ->
         return {"ok": False, "error": str(exc)}
 
 
-async def send_reminders(db: Session, plants_due: list[Plant], env: dict) -> dict:
-    title, body = build_watering_message(plants_due, env)
+async def send_reminders(db: Session, plants_due: list[Plant], env: dict, env_for=None) -> dict:
+    title, body = build_watering_message(plants_due, env, env_for)
     return await dispatch(db, title, body)
 
 

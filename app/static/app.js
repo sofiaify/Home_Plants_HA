@@ -8,6 +8,7 @@ const state = {
   editTemp: "",
   editHum: "",
   editRoomName: "",
+  calendarMonth: null,
 };
 
 const BASE = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/";
@@ -75,24 +76,6 @@ function statusLabel(status) {
   }[status] || status;
 }
 
-function relativeDays(days) {
-  if (days === null || days === undefined) return "never watered";
-  const rounded = Math.round(days);
-  if (rounded < 0) return `overdue ${Math.abs(rounded)}d`;
-  if (rounded === 0) return "due today";
-  if (rounded === 1) return "due tomorrow";
-  return `in ${rounded}d`;
-}
-
-function lastWateredText(iso) {
-  if (!iso) return "not watered yet";
-  const then = new Date(iso);
-  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
-  if (days <= 0) return "watered today";
-  if (days === 1) return "watered yesterday";
-  return `watered ${days}d ago`;
-}
-
 function fertilizeText(plant) {
   if (!plant.fertilize_in_season) return "feeding off-season";
   const d = plant.fertilize_days_until;
@@ -102,23 +85,39 @@ function fertilizeText(plant) {
   return `feed in ${Math.round(d)}d`;
 }
 
+function hydrationDot(plant) {
+  const f = plant.hydration_factor;
+  if (f === null || f === undefined) return { cls: "neutral", title: "No temperature/humidity sensors" };
+  if (f > 1.01) return { cls: "good", title: "Temperature/humidity help keep the soil moist" };
+  if (f < 0.99) return { cls: "dry", title: "Temperature/humidity are drying the plant out" };
+  return { cls: "neutral", title: "Temperature/humidity are neutral" };
+}
+
+function nextWateringText(plant) {
+  const d = plant.days_until_due;
+  if (d === null || d === undefined) return "Never watered yet";
+  const r = Math.round(d);
+  if (r < 0) return `Overdue by ${Math.abs(r)}d`;
+  if (r === 0) return "Water today";
+  if (r === 1) return "Water tomorrow";
+  return `In ${r} days`;
+}
+
+function fertilizerText(plant) {
+  if (plant.fertilize_interval_days <= 0) return "no feeding schedule";
+  return fertilizeText(plant);
+}
+
 function cardHTML(plant) {
   const photo = plant.photo ? asset(`photos/${plant.photo}`) : asset("static/placeholder.svg");
   const showOk = plant.status === "ok" || plant.status === "soon";
-  const reason = plant.adjustment_reason && plant.adjustment_reason !== "season baseline"
-    ? `<div class="reason">⤵ ${plant.adjustment_reason} · every ${plant.effective_interval_days}d</div>`
-    : `<div class="reason">every ${plant.effective_interval_days}d</div>`;
   const sickBadge = plant.is_sick ? `<span class="badge sick">🤒 Sick</span>` : "";
   const warnBadge = plant.sensor_warning
     ? `<span class="badge warn" title="No temperature or humidity sensors linked to this plant's room">⚠️</span>`
     : "";
-  const fertLine = plant.fertilize_interval_days > 0
-    ? `<div class="fert ${plant.fertilize_status === "overdue" || plant.fertilize_status === "due" ? "due" : ""}">🌱 ${fertilizeText(plant)}</div>`
-    : "";
+  const hyd = hydrationDot(plant);
+  const fertDue = plant.fertilize_status === "overdue" || plant.fertilize_status === "due";
   const sickNote = plant.is_sick && plant.sick_note ? `<div class="sick-note">${escapeHTML(plant.sick_note)}</div>` : "";
-  const feedBtn = plant.fertilize_interval_days > 0
-    ? `<button class="ghost icon-btn feed-btn" title="Mark as fed">🌱</button>`
-    : "";
   return `
     <div class="card ${plant.is_sick ? "is-sick" : ""}" data-id="${plant.id}">
       <img class="photo" src="${photo}" alt="${plant.name}" loading="lazy" />
@@ -127,14 +126,13 @@ function cardHTML(plant) {
         <h3>${escapeHTML(plant.name)}</h3>
         ${plant.species ? `<div class="species">${escapeHTML(plant.species)}</div>` : ""}
         <div class="loc">${plant.placement === "outdoor" ? "🌤" : "🏠"} ${escapeHTML(plant.location || "Unplaced")}</div>
-        <div class="meta"><span>${lastWateredText(plant.last_watered)}</span><span>${relativeDays(plant.days_until_due)}</span></div>
-        ${reason}
-        ${fertLine}
+        <div class="next"><span class="hyd-dot ${hyd.cls}" title="${escapeHTML(hyd.title)}"></span><span>${nextWateringText(plant)}</span></div>
+        <div class="fert ${fertDue ? "due" : ""}">🌱 ${escapeHTML(fertilizerText(plant))}</div>
         ${sickNote}
         <div class="row">
           <button class="primary water-btn">${showOk ? "💧 Water" : "💧 Mark watered"}</button>
           <button class="ghost icon-btn sick-btn" title="${plant.is_sick ? "Mark healthy" : "Mark sick"}">${plant.is_sick ? "💚" : "🤒"}</button>
-          ${feedBtn}
+          <button class="ghost icon-btn feed-btn" title="Mark as fed">🌱</button>
         </div>
       </div>
     </div>`;
@@ -148,6 +146,18 @@ function escapeHTML(value) {
 
 function renderPlants() {
   const grid = $("grid");
+  const calendar = $("calendar");
+
+  if (state.filter === "calendar") {
+    grid.classList.add("hidden");
+    $("empty").classList.add("hidden");
+    calendar.classList.remove("hidden");
+    renderCalendar();
+    return;
+  }
+  calendar.classList.add("hidden");
+  grid.classList.remove("hidden");
+
   let list = state.plants;
   if (state.filter === "due") list = list.filter((p) => ["overdue", "due"].includes(p.status));
   if (state.filter === "ok") list = list.filter((p) => ["ok", "soon"].includes(p.status) && !p.is_sick);
@@ -171,6 +181,70 @@ function renderPlants() {
     act(".sick-btn", () => (plant.is_sick ? markHealthy(id) : markSick(id)));
     act(".feed-btn", () => fertilizePlant(id));
   });
+}
+
+const CAL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function renderCalendar() {
+  const box = $("calendar");
+  const base = state.calendarMonth || new Date();
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const startWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Monday first
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const byDay = {};
+  (state.plants || []).forEach((plant) => {
+    if (!plant.next_due) return;
+    let due = new Date(plant.next_due);
+    if (isNaN(due)) return;
+    due = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+    if (due < startOfToday) due = startOfToday; // overdue -> show today
+    if (due.getFullYear() === year && due.getMonth() === month) {
+      (byDay[due.getDate()] = byDay[due.getDate()] || []).push(plant);
+    }
+  });
+
+  const monthName = base.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  let html = `<div class="cal-head">
+    <button type="button" class="ghost cal-nav" data-step="-1">‹</button>
+    <h2>${escapeHTML(monthName)}</h2>
+    <button type="button" class="ghost cal-nav" data-step="1">›</button>
+  </div><div class="cal-grid">`;
+  CAL_WEEKDAYS.forEach((wd) => { html += `<div class="cal-wd">${wd}</div>`; });
+  for (let i = 0; i < startWeekday; i++) html += `<div class="cal-cell empty"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cellDate = new Date(year, month, day);
+    const isToday = sameDay(cellDate, today);
+    const plants = byDay[day] || [];
+    const chips = plants
+      .map((p) => `<button type="button" class="cal-plant ${p.status}" data-id="${p.id}" title="${escapeHTML(
+        `${p.name}: ${nextWateringText(p)}`
+      )}">${escapeHTML(p.name)}</button>`)
+      .join("");
+    html += `<div class="cal-cell${isToday ? " today" : ""}">
+      <div class="cal-day">${day}</div>
+      <div class="cal-plants">${chips}</div>
+    </div>`;
+  }
+  html += `</div>`;
+  box.innerHTML = html;
+
+  box.querySelectorAll(".cal-nav").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      state.calendarMonth = new Date(year, month + Number(btn.dataset.step), 1);
+      renderCalendar();
+    })
+  );
+  box.querySelectorAll(".cal-plant").forEach((chip) =>
+    chip.addEventListener("click", () => openPlantModal(Number(chip.dataset.id)))
+  );
 }
 
 function renderWeather() {

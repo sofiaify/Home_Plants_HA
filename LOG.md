@@ -544,3 +544,21 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   so Bitwarden/1Password/LastPass stop treating them as login fields (which made
   their autofill menu pop up in the wrong place inside the ingress iframe).
   Version bumped to **1.1.2**.
+
+### 1.2.0 — Indoor weather fix, card redesign & calendar
+- **Indoor plants no longer use outdoor weather.** `compute_watering` only applies
+  a temperature factor from an indoor source (room sensor or the configured indoor
+  entity) and `environment.resolve` drops the weather entity's (outdoor) humidity
+  for indoor plants. Fixes indoor plants showing e.g. "cool (9°C) slows drying"
+  from the outdoor reading. The daily reminder and **Send test** now resolve each
+  plant's room sensors too (previously they ignored rooms).
+- **Tab order** is now Needs water → Sick → Happy → All plants, plus a new
+  **📅 Calendar** tab at the end.
+- **Calendar view** — current month (Mon-first) with the plants due each day as
+  clickable, status-colored chips; overdue plants show on today; prev/next month.
+- **Plant card redesign**, in order: status badge → name → scientific name →
+  location → next watering (+ a **hydration dot**: green = temp/humidity help keep
+  the soil moist, red = drying the plant, grey = neutral) → fertilizer state →
+  the three buttons.
+- New `PlantOut.hydration_factor` (temperature × humidity only, excluding
+  rain/weather) drives the dot. Version bumped to **1.2.0**.

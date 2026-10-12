@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home Plants</title>
-  <link rel="icon" href="static/favicon.png?v=1.1.2" />
-  <link rel="stylesheet" href="static/style.css?v=1.1.2" />
+  <link rel="icon" href="static/favicon.png?v=1.2.0" />
+  <link rel="stylesheet" href="static/style.css?v=1.2.0" />
 </head>
 <body>
   <header class="topbar">
@@ -26,11 +26,13 @@
   <nav class="filters">
     <button data-filter="due" class="active">Needs water</button>
     <button data-filter="sick">Sick</button>
-    <button data-filter="all">All plants</button>
     <button data-filter="ok">Happy</button>
+    <button data-filter="all">All plants</button>
+    <button data-filter="calendar">📅 Calendar</button>
   </nav>
 
   <main id="grid" class="grid"></main>
+  <section id="calendar" class="calendar hidden"></section>
   <p id="empty" class="empty hidden">No plants here yet. Add your first one.</p>
 
   <!-- Plant editor -->
@@ -140,6 +142,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="static/app.js?v=1.1.2"></script>
+  <script src="static/app.js?v=1.2.0"></script>
 </body>
 </html>

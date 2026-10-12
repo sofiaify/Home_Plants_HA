@@ -57,6 +57,10 @@ def resolve(plant: Plant, env: dict, states: dict, rooms: dict) -> dict:
         humidity = _num(states[humidity_entity].get("state"))
         if humidity is not None:
             result["humidity"] = humidity
+    else:
+        # Indoor plants shouldn't inherit the weather entity's humidity, which is
+        # an outdoor reading. Only a room humidity sensor applies.
+        result.pop("humidity", None)
     return result
 
 

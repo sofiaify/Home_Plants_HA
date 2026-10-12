@@ -53,6 +53,7 @@ def _to_out(
         effective_interval_days=res.effective_interval_days,
         adjustment_factor=res.adjustment_factor,
         adjustment_reason=res.adjustment_reason,
+        hydration_factor=res.hydration_factor,
         sick_since=as_utc(plant.sick_since),
         next_fertilize_due=fert.next_fertilize_due,
         fertilize_days_until=fert.fertilize_days_until,

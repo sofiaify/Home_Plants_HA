@@ -56,6 +56,7 @@ class PlantOut(PlantBase):
     status: str = "unknown"
     adjustment_factor: float = 1.0
     adjustment_reason: str = ""
+    hydration_factor: float = 1.0
     sick_since: datetime | None = None
     next_fertilize_due: datetime | None = None
     fertilize_days_until: float | None = None

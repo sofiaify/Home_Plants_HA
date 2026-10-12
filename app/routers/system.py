@@ -145,8 +145,12 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)):
 
 @router.post("/notify/test")
 async def test_notification(db: Session = Depends(get_db)):
-    env = await HAClient(db).get_weather()
+    env, states, rooms = await environment.collect(db)
+
+    def env_for(plant: Plant) -> dict:
+        return environment.resolve(plant, env, states, rooms)
+
     plants = db.query(Plant).limit(3).all()
     if not plants:
         plants = [Plant(name="Test plant", base_interval_days=7)]
-    return await send_reminders(db, plants, env)
+    return await send_reminders(db, plants, env, env_for=env_for)

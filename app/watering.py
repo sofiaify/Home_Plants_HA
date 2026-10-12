@@ -29,6 +29,8 @@ class WateringResult:
     status: str
     adjustment_factor: float
     adjustment_reason: str
+    # temp+humidity only (excludes weather/rain): >1 helps keep humidity, <1 dries
+    hydration_factor: float = 1.0
 
 
 def compute_watering(plant: Plant, env: dict | None, now: datetime | None = None) -> WateringResult:
@@ -36,11 +38,18 @@ def compute_watering(plant: Plant, env: dict | None, now: datetime | None = None
     env = env or {}
 
     indoor = (plant.placement or "indoor").lower() == "indoor"
-    temp = env.get("indoor_temp_c") if indoor else env.get("outdoor_temp_c")
-    if temp is None:
-        temp = env.get("temperature")
+    # Indoor plants only use an indoor temperature (room sensor or the configured
+    # indoor entity). Never fall back to the weather entity's temperature, which
+    # is an outdoor reading.
+    if indoor:
+        temp = env.get("indoor_temp_c")
+    else:
+        temp = env.get("outdoor_temp_c")
+        if temp is None:
+            temp = env.get("temperature")
 
     factor = 1.0
+    hydration = 1.0  # temperature × humidity contribution only
     reasons: list[tuple[float, str]] = []
 
     if temp is not None:
@@ -49,6 +58,7 @@ def compute_watering(plant: Plant, env: dict | None, now: datetime | None = None
             temp_factor = 1.0 - (temp - 21.0) * 0.03
             temp_factor = _clamp(temp_factor, 0.6, 1.5)
             factor *= temp_factor
+            hydration *= temp_factor
             if temp_factor < 0.98:
                 reasons.append((abs(1 - temp_factor), f"warm ({temp:.0f}°C) speeds drying"))
             elif temp_factor > 1.02:
@@ -62,9 +72,11 @@ def compute_watering(plant: Plant, env: dict | None, now: datetime | None = None
             humidity = float(humidity)
             if humidity >= 70:
                 factor *= 1.1
+                hydration *= 1.1
                 reasons.append((0.1, f"high humidity ({humidity:.0f}%)"))
             elif humidity <= 35:
                 factor *= 0.92
+                hydration *= 0.92
                 reasons.append((0.08, f"low humidity ({humidity:.0f}%)"))
         except (TypeError, ValueError):
             pass
@@ -125,6 +137,7 @@ def compute_watering(plant: Plant, env: dict | None, now: datetime | None = None
         status=status,
         adjustment_factor=round(factor, 3),
         adjustment_reason=reason,
+        hydration_factor=round(hydration, 3),
     )
 
 
