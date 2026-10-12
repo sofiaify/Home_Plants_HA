@@ -4,9 +4,10 @@ A small self-hosted web app to keep track of the houseplants in your home, remin
 you when to water them, and automatically adjust how often each plant needs water
 based on the weather and temperature reported by Home Assistant.
 
-It ships with your 12 plant photos and sensible default watering intervals, and
-can run either as a **Home Assistant add-on** (recommended on HA OS/Supervised),
+It can run either as a **Home Assistant add-on** (recommended on HA OS/Supervised),
 a **Docker container**, or directly with **Python** for development.
+
+![Home Plants app](docs/screenshot.png)
 
 ---
 
