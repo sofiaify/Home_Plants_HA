@@ -264,6 +264,13 @@ button.ghost:hover { background: #eef3ec; }
 .file-label { font-size: 13px; color: var(--muted); }
 
 /* Plant editor hero: name, then full-width photo, gallery, summary */
+#plant-modal-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
 .hero-info { display: flex; flex-direction: column; margin-bottom: 12px; }
 .hero-info h2 { margin: 0; font-size: clamp(24px, 4vw, 34px); line-height: 1.05; }
 .hero-species { font-style: italic; color: var(--muted); font-size: 16px; margin: 2px 0 0; }

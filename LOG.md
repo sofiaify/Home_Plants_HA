@@ -595,3 +595,7 @@ Replaced the app's own `Room` table / Settings rooms UI with HA **areas**:
   box → settings. Removed the side-by-side hero.
 - **Calendar** shows only the **current month and the next one** (2 months).
 - Version bumped to **1.4.1**.
+
+### 1.4.2 — Small editor title
+- The **Edit plant / Add plant** heading now uses the same small uppercase style as
+  the **Gallery** label. Version bumped to **1.4.2**.
