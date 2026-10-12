@@ -79,8 +79,8 @@ add-on doesn't need. Use `./deploy.sh --dry-run` to preview.
 <summary>Manual alternative (Samba / File editor)</summary>
 
 Copy the `ha-addon/` folder into Home Assistant's `/addons` share, then follow
-steps 1–3 above. `ha-addon/` must contain `app/`, `seed_data/` and
-`requirements.txt`; `deploy.sh` produces that layout automatically.
+steps 1–3 above. `ha-addon/` must contain `app/` and `requirements.txt`;
+`deploy.sh` produces that layout automatically.
 </details>
 
 
@@ -106,25 +106,6 @@ python3 -m venv .venv
 cp .env.example .env     # point HA_URL / HA_TOKEN at your instance
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8099 --reload
 ```
-
-### 4. Simulation (no Home Assistant required)
-
-To try the weather integration without a real Home Assistant, a mock HA lives in
-`sim/mock_ha.py`. It implements the same REST endpoints the app calls, plus a
-control panel where you can drag temperature/humidity/rain, switch the weather
-condition, and see the app react (it's embedded next to the controls).
-
-```bash
-./sim/run-sim.sh
-# mock HA control panel -> http://localhost:8123
-# plants app            -> http://localhost:8099
-```
-
-`run-sim.sh` starts the mock on `:8123` and launches the app pointed at it
-(`HA_URL=http://127.0.0.1:8123`, `HA_TOKEN=sim`, and the four entity IDs). Click
-a preset (**Hot & dry**, **Cool & rainy**, …) and apply to watch each plant's
-effective watering interval and reason change. Notifications are captured and
-listed on the panel too.
 
 ---
 
@@ -322,13 +303,11 @@ plants-app/
 │   ├── watering.py        # scheduling + weather-adjustment logic
 │   ├── notifications.py   # message building, HA notify + SMTP email
 │   ├── scheduler.py       # APScheduler jobs (daily check, env refresh)
-│   ├── bootstrap.py       # first-run seeding from bundled photos
 │   ├── routers/
 │   │   ├── plants.py      # plant CRUD, watering, history, photo upload
 │   │   ├── identify.py    # Pl@ntNet identification endpoints
 │   │   └── system.py      # weather, status, settings, test notification
 │   └── static/            # single-page web UI (HTML/CSS/vanilla JS)
-├── seed_data/photos/      # bundled plant photos used on first run
 ├── data/                  # runtime DB + photos (created on first run)
 ├── ha-addon/              # Home Assistant add-on (config.yaml, Dockerfile, run.sh)
 ├── Dockerfile             # standalone container image
@@ -378,11 +357,9 @@ All endpoints are under `/api`. Interactive docs are available at `/docs`
 - Everything lives in `PLANTS_DATA_DIR` (default `./data`):
   - `plants.db` — SQLite database (plants, watering events, settings, readings).
   - `photos/` — plant photos.
-- On the very first start, if the database is empty, the app copies the bundled
-  photos from `seed_data/photos` and creates one plant per photo. Later starts
-  are a no-op.
-- Photos uploaded from the UI are stored as-is on disk; the bundled seed photos
-  were pre-shrunk to ~1280 px so the web UI stays fast.
+- The database and photos are created on first run; the app starts empty and you
+  add your plants from the UI.
+- Photos uploaded from the UI are stored as-is on disk.
 
 ---
 

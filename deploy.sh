@@ -46,7 +46,6 @@ ADDON_DIR_NAME="${ADDON_DIR_NAME:-plants}"
 ADDON_SLUG="${ADDON_SLUG:-local_plants}"
 HA_API_URL="${HA_API_URL:-}"
 HA_TOKEN="${HA_TOKEN:-}"
-CARRY_DATA="${CARRY_DATA:-1}"
 
 SRC_DIR="$SCRIPT_DIR/ha-addon"
 REMOTE="${HA_SSH_USER}@${HA_HOST}"
@@ -57,22 +56,12 @@ say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
 
 # --- 1. Refresh the add-on build context from the app source ------------------
-say "Refreshing add-on build context (app/, seed_data/, requirements.txt)"
+say "Refreshing add-on build context (app/, requirements.txt)"
 mkdir -p "$SRC_DIR"
-rm -rf "$SRC_DIR/app" "$SRC_DIR/seed_data" "$SRC_DIR/requirements.txt"
+rm -rf "$SRC_DIR/app" "$SRC_DIR/requirements.txt"
 cp -R app "$SRC_DIR/app"
-cp -R seed_data "$SRC_DIR/seed_data"
 cp requirements.txt "$SRC_DIR/requirements.txt"
 find "$SRC_DIR/app" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
-
-# Optionally bundle the current data/ so the device starts with your plants.
-rm -f "$SRC_DIR/seed_data/plants.db"
-if [ "$CARRY_DATA" -eq 1 ] && [ -f data/plants.db ]; then
-  say "Bundling current data/ (plants.db + photos) for first run"
-  cp data/plants.db "$SRC_DIR/seed_data/plants.db"
-  mkdir -p "$SRC_DIR/seed_data/photos"
-  cp -f data/photos/* "$SRC_DIR/seed_data/photos/" 2>/dev/null || true
-fi
 
 if [ ! -f "$SRC_DIR/config.yaml" ]; then
   echo "ha-addon/config.yaml is missing" >&2

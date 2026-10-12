@@ -14,7 +14,6 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
-COPY seed_data ./seed_data
 COPY run.sh /run.sh
 RUN chmod +x /run.sh
 

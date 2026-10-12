@@ -8,9 +8,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .bootstrap import ensure_seeded, prepare_data_dir
 from .config import PHOTO_DIR, settings
-from .models import SessionLocal, init_db
+from .models import init_db
 from .routers import identify, plants, system
 from .scheduler import start as start_scheduler
 
@@ -24,10 +23,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    prepare_data_dir()
     init_db()
-    with SessionLocal() as db:
-        ensure_seeded(db)
     start_scheduler()
     yield
 
